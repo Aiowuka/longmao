@@ -68,3 +68,14 @@ CI 配置的存在不等于 CI 已通过；请检查该提交对应的 Actions �
 没有对微信、任何真实账号、定位、人脸或学校服务器做验证。
 
 本仓库保持私有；独立代码的公开许可证尚未由维护者选择，暂标记 `UNLICENSED`。
+
+## 查看来源记录
+
+```sh
+npm run sources
+```
+
+该命令显示两个上游的作者/贡献者、完整参考 commit、许可核对状态，以及 `integrated: false`。
+`doctor` 也会校验来源清单，防止漏署名、重复项目、无效版本号或将未集成误写为已集成。
+来源验证只针对本地元数据，不会联网证明当前许可证状态或代码兼容性。
+新增的 7 项来源测试与原有 31 项测试合计 38 项；本次验证详情见 [docs/PROVENANCE_VERIFICATION.md](docs/PROVENANCE_VERIFICATION.md)。

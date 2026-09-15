@@ -16,7 +16,9 @@
       ],
       "referenceRole": "Client/backend separation and staged workflow description; no code or production contract copied.",
       "vendored": false,
-      "runtimeDependency": false
+      "runtimeDependency": false,
+      "creditedTo": "yuyuyudlc and Totoro contributors",
+      "integrated": false
     },
     {
       "name": "WMPFDebugger",
@@ -30,7 +32,9 @@
       ],
       "referenceRole": "Understanding the separation between runtime observation and a business client; no hooking, CDP or credential logic included.",
       "vendored": false,
-      "runtimeDependency": false
+      "runtimeDependency": false,
+      "creditedTo": "evi0s and WMPFDebugger contributors",
+      "integrated": false
     }
   ]
 }

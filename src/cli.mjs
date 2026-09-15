@@ -3,17 +3,24 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {LabError, runDemo, SCENARIOS} from './lab.mjs';
+import {validateSourceManifest} from './provenance.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const help = `longmao-local-lab — OFFLINE MOCK ONLY
 
 node src/cli.mjs doctor
+node src/cli.mjs sources
 node src/cli.mjs demo [--scenario success|expired-session|rejected-submission]
 node src/cli.mjs help
 
 No WeChat launch, debugger connection, token extraction or external submission.
 The fixture is not a production API contract. No npm install is required.
 `;
+
+async function loadSources() {
+  const manifest = JSON.parse(await readFile(join(root, 'upstreams.lock.json'), 'utf8'));
+  return validateSourceManifest(manifest);
+}
 
 async function saveReport(report) {
   const directory = join(root, 'artifacts');
@@ -34,13 +41,16 @@ async function main() {
     return;
   }
   if (Number(process.versions.node.split('.')[0]) < 22) throw new LabError('NODE_22_OR_NEWER_REQUIRED');
+  if (command === 'sources' && args.length === 0) {
+    console.log(JSON.stringify(await loadSources(), null, 2));
+    return;
+  }
   if (command === 'doctor' && args.length === 0) {
-    const manifest = JSON.parse(await readFile(join(root, 'upstreams.lock.json'), 'utf8'));
-    if (manifest.schemaVersion !== 1 || manifest.sources.length !== 2) throw new LabError('INVALID_SOURCE_MANIFEST');
+    const manifest = await loadSources();
     console.log(JSON.stringify({
       mode: 'offline-mock', node: process.versions.node, platform: process.platform,
       externalConnections: false, runtimeDependencies: 0,
-      sourceReferences: manifest.sources.map(({repository, commit}) => ({repository, commit})),
+      sourceReferences: manifest.sources.map(({repository, commit, creditedTo, integrated}) => ({repository, commit, creditedTo, integrated})),
       upstreamCompatibility: 'NOT_TESTED — no upstream code is executed',
     }, null, 2));
     return;
