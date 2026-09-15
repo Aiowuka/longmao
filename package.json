@@ -1,0 +1,17 @@
+{
+  "name": "longmao-local-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "description": "Offline workflow reproduction lab; no WeChat instrumentation or production requests.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "doctor": "node src/cli.mjs doctor",
+    "demo": "node src/cli.mjs demo",
+    "test": "node --test tests/lab.test.mjs",
+    "reproduce": "node src/cli.mjs doctor && node --test tests/lab.test.mjs && node src/cli.mjs demo"
+  }
+}

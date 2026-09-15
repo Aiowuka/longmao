@@ -1,18 +1,70 @@
-# longmao
+# longmao — 本地离线复现实验
 
-本地复现实验项目。当前 `main` 仅初始化项目说明与来源记录；离线模拟实现将放在独立分支 `feat/offline-reproduction-lab`，不自动合并。
+> **交付范围：可运行的本地模拟流水线，不是自动代跑程序。**
+> 未连接微信、WMPFDebugger、Totoro 或学校生产后端；不提取 Token，不提交真实成绩。
+> 模拟测试通过不表示官方接口可用、上游集成成功或跑步记录有效。
 
-## 方法来源与致谢
+## 一键运行
 
-- [Totoro Sunrun — yuyuyudlc 与贡献者](https://github.com/yuyuyudlc/Totoro)：参考客户端/服务端分层及分阶段任务流程的文档。参考版本 `5b3199f864e114f4981403d05c94160ebdd730ab`。
-- [WMPFDebugger — evi0s 与贡献者](https://github.com/evi0s/WMPFDebugger)：参考运行时观察工具与业务客户端职责分离的思路。参考版本 `e65e3ec98ea38de8ea78fc0ad02d01d9b2fd0345`。
+需要 Node.js 22 或更高版本。没有第三方运行依赖，**不需要 `npm install`、微信或服务器**。
+在本分支的项目目录运行：
 
-核对日期：2026-09-15。上游成果不属于本项目原创；这里不表示上游作者参与或背书。
-WMPFDebugger 声明采用 GPLv2；Totoro 的明确项目许可在已核对的 README/package.json 中尚未确认。
-注明来源不能代替履行许可证义务，本次不复制任何上游代码或二进制。
+```sh
+npm run reproduce
+```
 
-## 交付边界
+该命令依次检查本地环境、执行自动化测试、运行一次成功模拟，并保存 `artifacts/last-report.json`。
+Windows 也可以双击根目录 `start.bat` 运行环境检查与模拟。
+程序运行结束即退出，不会建立后台定时任务或监听公网端口。
 
-拟提交内容为独立编写的本地离线模拟与测试，不是两个项目的真实集成版本，也不是自动代跑成品。
-不自动获取微信登录凭据，不连接学校生产后端，不提交虚假成绩。
-模拟测试通过不表示真实接口可用或实际跑步记录有效。仓库保持私有，公开许可证尚未选择。
+```sh
+npm run doctor
+npm test
+npm run demo
+node src/cli.mjs demo --scenario expired-session
+node src/cli.mjs demo --scenario rejected-submission
+```
+
+后两种场景用于验证异常处理，**预期退出码为 1**，不代表安装失败。成功场景返回 0。
+每次模拟覆盖本地报告；报告目录默认不进入 Git。
+
+## 实现内容
+
+```text
+模拟登录 → 读取固定测试任务 → 创建内存任务
+       → 准备固定示例 → 内存提交 → 验证模拟回执
+```
+
+这是一个独立编写的离线状态机。示例只含 `demoOnly`、`fixtureId`、`sampleCount`，没有地理轨迹、真实用户或生产请求结构。
+实现了会话检查、状态检查、幂等提交、失败停止、清理、固定错误码及 JSON 报告。
+输入不支持外部 URL、Cookie、真实 Token 或动态执行插件；没有可切换到生产环境的适配器。
+
+| 路径 | 作用 |
+| --- | --- |
+| `src/lab.mjs` | 固定模拟数据、内存后端与六阶段编排 |
+| `src/cli.mjs` | 环境检查、命令行入口和原子报告写入 |
+| `tests/lab.test.mjs` | 成功、失败、幂等、输入与命令行回归测试 |
+| `start.bat` | Windows 本地启动入口 |
+| `.github/workflows/ci.yml` | Ubuntu / Windows，Node.js 22 / 24 测试矩阵 |
+| `THIRD_PARTY_NOTICES.md` | 方法来源、作者与许可状态 |
+| `upstreams.lock.json` | 固定参考版本；不是可执行依赖 |
+
+## 方法参考与致谢
+
+感谢 [yuyuyudlc/Totoro](https://github.com/yuyuyudlc/Totoro) 和
+[evi0s/WMPFDebugger](https://github.com/evi0s/WMPFDebugger) 的作者及贡献者公开项目资料。
+本实验参考了“运行时观察与业务客户端分工”和“分阶段任务流水线”的架构背景。
+**不把上游成果声称为本项目原创，也不声称这份模拟代码是两个仓库的接线实现。**
+
+WMPFDebugger 上游声明 GPLv2；Totoro 在已核对材料中的许可证未确认。
+本次未复制上游代码或二进制。详细参考版本、许可注意事项及第三方版权说明见
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 验证边界
+
+当前交付在 Linux / Node.js 22.16.0 中执行了自动化测试和命令行模拟。
+Windows 启动脚本及其他运行环境需以对应 CI 或实机执行结果为准，不能用 Linux 测试替代。
+CI 配置的存在不等于 CI 已通过；请检查该提交对应的 Actions 结果。
+没有对微信、任何真实账号、定位、人脸或学校服务器做验证。
+
+本仓库保持私有；独立代码的公开许可证尚未由维护者选择，暂标记 `UNLICENSED`。

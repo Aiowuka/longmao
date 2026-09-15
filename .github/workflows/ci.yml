@@ -1,0 +1,31 @@
+name: Offline lab CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: offline-lab-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22', '24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Check local environment
+        run: npm run doctor
+      - name: Run offline tests
+        run: npm test
+      - name: Run successful demo
+        run: npm run demo

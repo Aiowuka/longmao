@@ -1,0 +1,10 @@
+node_modules/
+artifacts/
+.env
+.env.*
+*.log
+*.har
+*.tmp
+vendor/
+.DS_Store
+Thumbs.db

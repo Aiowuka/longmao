@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-09-15",
+  "purpose": "Attribution and research reference only; not a dependency lockfile.",
+  "sources": [
+    {
+      "name": "Totoro Sunrun",
+      "repository": "yuyuyudlc/Totoro",
+      "url": "https://github.com/yuyuyudlc/Totoro",
+      "commit": "5b3199f864e114f4981403d05c94160ebdd730ab",
+      "licenseStatus": "unconfirmed",
+      "reviewedFiles": [
+        "README.md",
+        "package.json",
+        "dialog/index.md"
+      ],
+      "referenceRole": "Client/backend separation and staged workflow description; no code or production contract copied.",
+      "vendored": false,
+      "runtimeDependency": false
+    },
+    {
+      "name": "WMPFDebugger",
+      "repository": "evi0s/WMPFDebugger",
+      "url": "https://github.com/evi0s/WMPFDebugger",
+      "commit": "e65e3ec98ea38de8ea78fc0ad02d01d9b2fd0345",
+      "licenseStatus": "GPLv2 per upstream README and LICENSE; third-party code must be reviewed separately",
+      "reviewedFiles": [
+        "README.md",
+        "LICENSE"
+      ],
+      "referenceRole": "Understanding the separation between runtime observation and a business client; no hooking, CDP or credential logic included.",
+      "vendored": false,
+      "runtimeDependency": false
+    }
+  ]
+}
