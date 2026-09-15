@@ -17,8 +17,8 @@ export function validateSourceManifest(manifest) {
     if (!plainObject(source) || !repositories.has(source.repository) || seen.has(source.repository) ||
         source.url !== `https://github.com/${source.repository}` ||
         typeof source.commit !== 'string' || !/^[a-f0-9]{40}$/.test(source.commit) ||
-        !nonempty(source.creditedTo) || !nonempty(source.licenseStatus) ||
-        source.vendored !== false || source.runtimeDependency !== false || source.integrated !== false) fail();
+        !nonempty(source.creditedTo) || !nonempty(source.licenseStatus) || !nonempty(source.license) || !nonempty(source.integrationRole) ||
+        source.vendored !== false || source.runtimeDependency !== true || source.integrated !== true) fail();
     seen.add(source.repository);
   }
   return structuredClone(manifest);

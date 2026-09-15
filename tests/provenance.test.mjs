@@ -30,13 +30,16 @@ test('source references require a full commit and correct repository URL', () =>
   const wrong = fresh(); wrong.sources[0].url = 'https://example.invalid'; invalid(wrong);
 });
 
-test('attribution and unintegrated status cannot be silently omitted', () => {
+test('attribution and integrated status cannot be silently omitted', () => {
   const missing = fresh(); delete missing.sources[0].creditedTo; invalid(missing);
   const blank = fresh(); blank.sources[0].creditedTo = ' '; invalid(blank);
-  for (const field of ['vendored', 'runtimeDependency', 'integrated']) {
-    const changed = fresh(); changed.sources[0][field] = true; invalid(changed);
+  const vendored = fresh(); vendored.sources[0].vendored = true; invalid(vendored);
+  for (const field of ['runtimeDependency', 'integrated']) {
+    const changed = fresh(); changed.sources[0][field] = false; invalid(changed);
   }
   const license = fresh(); delete license.sources[0].licenseStatus; invalid(license);
+  const licenseName = fresh(); delete licenseName.sources[0].license; invalid(licenseName);
+  const role = fresh(); delete role.sources[0].integrationRole; invalid(role);
 });
 
 test('invalid metadata dates and shapes fail validation', () => {
@@ -53,7 +56,7 @@ test('sources command displays both credited reference snapshots', () => {
   assert.equal(sources.length, 2);
   assert.match(sources[0].creditedTo, /yuyuyudlc/);
   assert.match(sources[1].creditedTo, /evi0s/);
-  assert.ok(sources.every(source => source.integrated === false));
+  assert.ok(sources.every(source => source.integrated === true));
 });
 
 test('sources command rejects extra credential arguments without echoing them', () => {

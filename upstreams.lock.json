@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "checkedAt": "2026-09-15",
-  "purpose": "Attribution and research reference only; not a dependency lockfile.",
+  "purpose": "Pinned external source checkouts used by the local integration lab; source is never vendored.",
   "sources": [
     {
       "name": "Totoro Sunrun",
@@ -9,6 +9,8 @@
       "url": "https://github.com/yuyuyudlc/Totoro",
       "commit": "5b3199f864e114f4981403d05c94160ebdd730ab",
       "licenseStatus": "unconfirmed",
+      "license": "NO LICENSE FILE FOUND — all rights reserved unless upstream clarifies",
+      "integrationRole": "Native Next.js backend and direct lib/server module execution behind a loopback-only transport guard",
       "reviewedFiles": [
         "README.md",
         "package.json",
@@ -16,9 +18,9 @@
       ],
       "referenceRole": "Client/backend separation and staged workflow description; no code or production contract copied.",
       "vendored": false,
-      "runtimeDependency": false,
+      "runtimeDependency": true,
       "creditedTo": "yuyuyudlc and Totoro contributors",
-      "integrated": false
+      "integrated": true
     },
     {
       "name": "WMPFDebugger",
@@ -26,15 +28,17 @@
       "url": "https://github.com/evi0s/WMPFDebugger",
       "commit": "e65e3ec98ea38de8ea78fc0ad02d01d9b2fd0345",
       "licenseStatus": "GPLv2 per upstream README and LICENSE; third-party code must be reviewed separately",
+      "license": "GPL-2.0-only per upstream README and LICENSE",
+      "integrationRole": "Real CDP WebSocket proxy and mini-program runtime observer source checkout",
       "reviewedFiles": [
         "README.md",
         "LICENSE"
       ],
       "referenceRole": "Understanding the separation between runtime observation and a business client; no hooking, CDP or credential logic included.",
       "vendored": false,
-      "runtimeDependency": false,
+      "runtimeDependency": true,
       "creditedTo": "evi0s and WMPFDebugger contributors",
-      "integrated": false
+      "integrated": true
     }
   ]
 }

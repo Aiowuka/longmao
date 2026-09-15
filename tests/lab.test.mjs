@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile, readdir} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
@@ -120,19 +120,22 @@ test('demo does not use fetch', () => {
   globalThis.fetch = () => { throw new Error('NETWORK_CALL_FORBIDDEN'); };
   try { assert.equal(runDemo().ok, true); } finally { globalThis.fetch = original; }
 });
-test('runtime source has no network, subprocess or dynamic upstream imports', async () => {
-  for (const name of await readdir(join(root, 'src'))) {
+test('legacy offline demo source remains isolated from integration I/O', async () => {
+  for (const name of ['lab.mjs', 'cli.mjs', 'provenance.mjs']) {
     const source = await readFile(join(root, 'src', name), 'utf8');
     assert.doesNotMatch(source, /node:(?:http|https|net|tls|dgram|child_process)|\bfetch\s*\(|\bWebSocket\s*\(|\bimport\s*\(/);
   }
 });
-test('reference commits are pinned and not runtime dependencies', async () => {
+test('integration upstreams are pinned, attributed and never vendored', async () => {
   const lock = JSON.parse(await readFile(join(root, 'upstreams.lock.json'), 'utf8'));
   assert.equal(lock.sources.length, 2);
   for (const source of lock.sources) {
     assert.match(source.commit, /^[a-f0-9]{40}$/);
     assert.equal(source.vendored, false);
-    assert.equal(source.runtimeDependency, false);
+    assert.equal(source.runtimeDependency, true);
+    assert.equal(source.integrated, true);
+    assert.equal(typeof source.license, 'string');
+    assert.equal(typeof source.integrationRole, 'string');
   }
 });
 test('help succeeds without installation', () => {

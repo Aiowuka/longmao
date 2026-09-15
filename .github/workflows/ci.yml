@@ -1,11 +1,11 @@
-name: Offline lab CI
+name: Longmao integration CI
 on:
   push:
   pull_request:
 permissions:
   contents: read
 concurrency:
-  group: offline-lab-${{ github.workflow }}-${{ github.ref }}
+  group: integration-lab-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   test:
@@ -15,7 +15,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         node: ['22', '24']
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,9 +23,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - name: Check local environment
-        run: npm run doctor
-      - name: Run offline tests
+      - name: Install longmao dependencies
+        run: npm ci
+      - name: Clone pinned Totoro upstream
+        shell: bash
+        run: |
+          git clone https://github.com/yuyuyudlc/Totoro.git ../Totoro
+          git -C ../Totoro checkout 5b3199f864e114f4981403d05c94160ebdd730ab
+          corepack pnpm --dir ../Totoro install --frozen-lockfile --ignore-scripts
+      - name: Clone pinned WMPFDebugger upstream
+        shell: bash
+        run: |
+          git clone https://github.com/evi0s/WMPFDebugger.git ../WMPFDebugger
+          git -C ../WMPFDebugger checkout e65e3ec98ea38de8ea78fc0ad02d01d9b2fd0345
+      - name: Check integration environment
+        run: npm run integration:doctor
+      - name: Run unit and native Totoro integration tests
         run: npm test
       - name: Run successful demo
         run: npm run demo
