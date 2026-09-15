@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {EventEmitter} from 'node:events';
+import {createServer as createHttpServer} from 'node:http';
 import {WebSocketServer} from 'ws';
 import {sanitize} from '../src/integrations/wmpf/sanitizer.mjs';
 import {CdpClient} from '../src/integrations/wmpf/cdp-client.mjs';
@@ -10,6 +11,9 @@ import {LabBackend} from '../src/lab-backend/server.mjs';
 import {TotoroAdapter} from '../src/integrations/totoro/adapter.mjs';
 import {BridgeController} from '../src/bridge/controller.mjs';
 import {isPortReady} from '../src/integrations/wmpf/detector.mjs';
+import {WmpfObserver} from '../src/integrations/wmpf/observer.mjs';
+import {TotoroUiProxy} from '../src/ui/totoro-proxy.mjs';
+import {openBrowser} from '../src/ui/open-browser.mjs';
 
 test('sanitizer removes nested credentials before logging', () => {
   const result = sanitize({headers: {Authorization: 'Bearer secret', Cookie: 'sid=secret'}, token: 'secret', text: 'openid=abc'});
@@ -18,6 +22,106 @@ test('sanitizer removes nested credentials before logging', () => {
   assert.equal(result.value.token, '***');
   assert.ok(!JSON.stringify(result.value).includes('secret'));
   assert.ok(!JSON.stringify(result.value).includes('abc'));
+});
+
+test('observer hands an allowed Totoro bearer token through memory while publishing only redacted events', async () => {
+  const client = new EventEmitter();
+  const observer = new WmpfObserver(client);
+  observer.start();
+  const credential = new Promise(resolve => observer.once('credential', resolve));
+  const observed = new Promise(resolve => observer.once('event', resolve));
+  client.emit('event', {
+    method: 'Network.requestWillBeSent',
+    params: {request: {url: 'https://wxxcx.xtotoro.com/wxxcx/test', headers: {Authorization: 'Bearer private-runtime-token'}}},
+  });
+  assert.equal(await credential, 'private-runtime-token');
+  assert.doesNotMatch(JSON.stringify(await observed), /private-runtime-token/);
+  let leaked = false;
+  observer.once('credential', () => { leaked = true; });
+  client.emit('event', {
+    method: 'Network.requestWillBeSent',
+    params: {request: {url: 'https://example.com/a', headers: {Authorization: 'Bearer untrusted-token'}}},
+  });
+  client.emit('event', {
+    method: 'Network.requestWillBeSent',
+    params: {request: {url: 'http://wxxcx.xtotoro.com/wxxcx/test', headers: {Authorization: 'Bearer spoofed-token'}}},
+  });
+  client.emit('event', {
+    method: 'Network.requestWillBeSent',
+    params: {request: {url: 'https://wxxcx.xtotoro.com:444/wxxcx/test', headers: {Authorization: 'Bearer spoofed-token'}}},
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(leaked, false);
+});
+
+test('Totoro UI proxy injects the ephemeral handoff without modifying upstream HTML', async t => {
+  let upstreamCookie;
+  const upstream = createHttpServer((request, response) => {
+    upstreamCookie = request.headers.cookie || '';
+    response.setHeader('content-type', 'text/html; charset=utf-8');
+    response.setHeader('set-cookie', ['totoro_server=ok; Path=/', 'longmao_session=evil; Path=/']);
+    response.end('<!doctype html><html><head></head><body><input id="login-token"></body></html>');
+  });
+  await new Promise(resolve => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => upstream.close(resolve)));
+  const proxy = new TotoroUiProxy({upstreamUrl: `http://127.0.0.1:${upstream.address().port}`, port: 0});
+  await proxy.start();
+  t.after(() => proxy.close());
+  const launch = await fetch(proxy.url, {redirect: 'manual'});
+  assert.equal(launch.status, 302);
+  const cookie = launch.headers.get('set-cookie').split(';')[0];
+  assert.equal((await fetch(proxy.url, {redirect: 'manual'})).status, 404);
+  assert.equal((await fetch(proxy.origin, {headers: {host: 'attacker.example'}})).status, 404);
+  const sessionHeaders = {cookie: `${cookie}; totoro_pref=preserved`};
+  const page = await fetch(proxy.origin, {headers: sessionHeaders});
+  const html = await page.text();
+  assert.match(html, /__longmao\/credential/);
+  assert.doesNotMatch(html, /Storage\.prototype\.setItem|isLoggedIn=false/);
+  assert.doesNotMatch(html, /private-runtime-token/);
+  assert.equal(upstreamCookie, 'totoro_pref=preserved');
+  assert.deepEqual(page.headers.getSetCookie(), ['totoro_server=ok; Path=/']);
+  const credentialPath = html.match(/\/__longmao\/credential\?key=[A-Za-z0-9_-]+/)?.[0];
+  const readyPath = html.match(/\/__longmao\/dashboard-ready\?key=[A-Za-z0-9_-]+/)?.[0];
+  assert.ok(credentialPath);
+  assert.ok(readyPath);
+  proxy.offerCredential('private-runtime-token');
+  const clientCredentialPath = `${credentialPath}&client=00000000-0000-4000-8000-000000000001`;
+  const claimed = await (await fetch(new URL(clientCredentialPath, proxy.origin), {method: 'POST', headers: sessionHeaders})).json();
+  assert.equal(claimed[0], null);
+  await new Promise(resolve => setTimeout(resolve, 260));
+  const delivered = await (await fetch(new URL(clientCredentialPath, proxy.origin), {method: 'POST', headers: sessionHeaders})).json();
+  assert.equal(delivered[0], 'private-runtime-token');
+  const secondClientPath = `${credentialPath}&client=00000000-0000-4000-8000-000000000002`;
+  await fetch(new URL(secondClientPath, proxy.origin), {method: 'POST', headers: sessionHeaders});
+  await new Promise(resolve => setTimeout(resolve, 260));
+  const secondClient = await (await fetch(new URL(secondClientPath, proxy.origin), {method: 'POST', headers: sessionHeaders})).json();
+  assert.equal(secondClient[0], null);
+  const consumed = await (await fetch(new URL(clientCredentialPath, proxy.origin), {method: 'POST', headers: sessionHeaders})).json();
+  assert.equal(consumed[0], null);
+  proxy.offerCredential('refreshed-runtime-token');
+  const reclaimed = await (await fetch(new URL(clientCredentialPath, proxy.origin), {method: 'POST', headers: sessionHeaders})).json();
+  assert.equal(reclaimed[0], null);
+  await new Promise(resolve => setTimeout(resolve, 260));
+  const refreshed = await (await fetch(new URL(clientCredentialPath, proxy.origin), {method: 'POST', headers: sessionHeaders})).json();
+  assert.equal(refreshed[0], 'refreshed-runtime-token');
+  const dashboardReady = new Promise(resolve => proxy.once('dashboardReady', resolve));
+  const ready = await fetch(new URL(readyPath, proxy.origin), {
+    method: 'POST',
+    headers: {...sessionHeaders, origin: proxy.origin, 'sec-fetch-site': 'same-origin'},
+  });
+  assert.equal(ready.status, 200);
+  await dashboardReady;
+  const oversized = await fetch(new URL('/api/oversized', proxy.origin), {
+    method: 'POST', headers: sessionHeaders, body: Buffer.alloc(1024 * 1024 + 1),
+  });
+  assert.equal(oversized.status, 413);
+});
+
+test('browser launcher reports launch failures instead of claiming success', async () => {
+  assert.throws(() => openBrowser('https://example.com'), /BROWSER_URL_MUST_BE_LOOPBACK/);
+  await assert.rejects(openBrowser('http://127.0.0.1:3211', {
+    spawnImpl: () => { throw new Error('missing opener'); },
+  }), /BROWSER_OPEN_FAILED/);
 });
 
 test('WMPF detector reports a closed CDP port as unavailable', async () => {

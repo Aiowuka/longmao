@@ -1,7 +1,7 @@
 import {EventEmitter} from 'node:events';
 import WebSocket from 'ws';
 
-const DOMAINS = ['Runtime.enable', 'Network.enable', 'Page.enable'];
+const DOMAINS = ['Network.enable', 'Runtime.enable', 'Page.enable'];
 
 export class CdpClient extends EventEmitter {
   #endpoint;

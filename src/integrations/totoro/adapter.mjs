@@ -7,6 +7,35 @@ import {assertLoopbackUrl, createLocalTransport} from './local-transport.mjs';
 import {childIsRunning, stopProcessTree} from '../../process-tree.mjs';
 
 const delay = ms => new Promise(resolveDelay => setTimeout(resolveDelay, ms));
+const guardPath = resolve(import.meta.dirname, 'totoro-fetch-guard.mjs');
+const guardUrl = pathToFileURL(guardPath).href;
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function withoutLongmaoGuard(nodeOptions = '') {
+  let result = nodeOptions;
+  for (const target of [guardUrl, guardPath]) {
+    const escaped = escapeRegExp(target);
+    result = result.replace(new RegExp(`(?:^|\\s)--import(?:=|\\s+)(?:["']${escaped}["']|${escaped})(?=\\s|$)`, 'g'), ' ');
+  }
+  return result.trim().replace(/\s+/g, ' ');
+}
+
+export function createTotoroEnvironment({transport, backendUrl, inherited = process.env} = {}) {
+  const environment = {...inherited, NEXT_TELEMETRY_DISABLED: '1'};
+  if (transport === 'local') {
+    environment.LONGMAO_LOCAL_BACKEND_URL = backendUrl;
+    environment.NODE_OPTIONS = `${inherited.NODE_OPTIONS || ''} --import=${guardUrl}`.trim();
+  } else {
+    delete environment.LONGMAO_LOCAL_BACKEND_URL;
+    const nodeOptions = withoutLongmaoGuard(inherited.NODE_OPTIONS);
+    if (nodeOptions) environment.NODE_OPTIONS = nodeOptions;
+    else delete environment.NODE_OPTIONS;
+  }
+  return environment;
+}
 
 async function jsonPost(url, body, timeoutMs) {
   const response = await fetch(url, {
@@ -21,15 +50,18 @@ async function jsonPost(url, body, timeoutMs) {
 export class TotoroAdapter {
   #root;
   #backendUrl;
+  #transport;
   #url;
   #process;
   #timeoutMs;
 
-  constructor({root, backendUrl = 'http://127.0.0.1:3210', host = '127.0.0.1', port = 3220, timeoutMs = 30000} = {}) {
+  constructor({root, backendUrl = 'http://127.0.0.1:3210', transport = 'local', host = '127.0.0.1', port = 3220, timeoutMs = 30000} = {}) {
     if (!root) throw new Error('TOTORO_ROOT_REQUIRED');
     this.#root = root instanceof URL ? fileURLToPath(root) : resolve(root);
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('INVALID_TOTORO_PORT');
-    this.#backendUrl = assertLoopbackUrl(backendUrl).href;
+    if (!['local', 'native'].includes(transport)) throw new Error('INVALID_TOTORO_TRANSPORT');
+    this.#transport = transport;
+    this.#backendUrl = transport === 'local' ? assertLoopbackUrl(backendUrl).href : null;
     this.#url = assertLoopbackUrl(`http://${host}:${port}`).href;
     this.#timeoutMs = timeoutMs;
   }
@@ -43,18 +75,13 @@ export class TotoroAdapter {
     await this.inspect();
     await access(resolve(this.#root, 'node_modules/next/package.json'))
       .catch(() => { throw new Error('TOTORO_DEPENDENCIES_MISSING'); });
-    const guard = pathToFileURL(resolve(import.meta.dirname, 'totoro-fetch-guard.mjs')).href;
     const executable = resolve(this.#root, 'node_modules/next/dist/bin/next');
     const port = new URL(this.#url).port;
     const host = new URL(this.#url).hostname;
+    const environment = createTotoroEnvironment({transport: this.#transport, backendUrl: this.#backendUrl});
     this.#process = spawn(process.execPath, [executable, 'dev', '--hostname', host, '--port', port], {
       cwd: this.#root,
-      env: {
-        ...process.env,
-        NEXT_TELEMETRY_DISABLED: '1',
-        LONGMAO_LOCAL_BACKEND_URL: this.#backendUrl,
-        NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --import=${guard}`.trim(),
-      },
+      env: environment,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: false,
     });
@@ -78,6 +105,7 @@ export class TotoroAdapter {
   }
 
   async runNativeWorkflow() {
+    if (this.#transport !== 'local') throw new Error('LOCAL_TOTORO_TRANSPORT_REQUIRED');
     if (!this.running) throw new Error('TOTORO_NATIVE_SERVER_NOT_RUNNING');
     const login = await jsonPost(new URL('/api/login/token', this.#url), {token: 'DEMO_SESSION'}, this.#timeoutMs);
     const profile = login.data;
@@ -94,6 +122,7 @@ export class TotoroAdapter {
   }
 
   async runModuleWorkflow() {
+    if (this.#transport !== 'local') throw new Error('LOCAL_TOTORO_TRANSPORT_REQUIRED');
     const modules = await loadTotoroModules({root: this.#root});
     const fetchImpl = createLocalTransport(this.#backendUrl);
     const profile = await modules.loginWithToken('DEMO_SESSION', {fetchImpl});

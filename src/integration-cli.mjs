@@ -8,9 +8,10 @@ import {CdpClient} from './integrations/wmpf/cdp-client.mjs';
 import {detectIntegrationPrerequisites, isPortReady, startWmpfDebugger} from './integrations/wmpf/detector.mjs';
 import {WmpfObserver} from './integrations/wmpf/observer.mjs';
 import {TotoroAdapter} from './integrations/totoro/adapter.mjs';
-import {LabBackend} from './lab-backend/server.mjs';
 import {BridgeController} from './bridge/controller.mjs';
 import {childIsRunning, stopProcessTree} from './process-tree.mjs';
+import {TotoroUiProxy} from './ui/totoro-proxy.mjs';
+import {openBrowser} from './ui/open-browser.mjs';
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const workspaceRoot = dirname(projectRoot);
@@ -71,7 +72,7 @@ async function doctor() {
   return {
     mode: 'real-wmpf-native-totoro', node: process.versions.node, platform: process.platform,
     ...prerequisites, upstreams, totoro: {...totoro, root: totoroRoot}, wmpfRoot,
-    credentials: 'never persisted', productionTransport: 'blocked',
+    credentials: 'not persisted by longmao', productionTransport: 'Totoro native behavior',
   };
 }
 
@@ -81,22 +82,30 @@ async function run() {
   if (!status.node) throw new Error('NODE_22_OR_NEWER_REQUIRED');
   if (!status.wechat) throw new Error('WECHAT_PROCESS_NOT_DETECTED');
   if (!status.upstreams.every(upstream => upstream.matches)) throw new Error('UPSTREAM_COMMIT_MISMATCH');
-  const backend = new LabBackend();
   let wmpfProcess;
   let adapter;
+  let uiProxy;
   let client;
   let wmpfExited = new Promise(() => {});
-  let rejectAbort;
-  const aborted = new Promise((_resolve, reject) => { rejectAbort = reject; });
-  const onSignal = () => rejectAbort(new Error('INTEGRATION_INTERRUPTED'));
+  let resolveStop;
+  const stopped = new Promise(resolveStopped => { resolveStop = resolveStopped; });
+  const interrupted = stopped.then(() => { throw new Error('INTEGRATION_INTERRUPTED'); });
+  const onSignal = () => resolveStop();
   process.once('SIGINT', onSignal);
   process.once('SIGTERM', onSignal);
+  let primaryError;
   try {
-    await backend.start();
-    console.log('Local contract backend healthy');
-    adapter = new TotoroAdapter({root: totoroRoot, backendUrl: backend.url});
+    adapter = new TotoroAdapter({root: totoroRoot, transport: 'native'});
     await adapter.start();
-    console.log('Totoro native backend loaded');
+    console.log('Totoro native service loaded');
+    uiProxy = new TotoroUiProxy({upstreamUrl: adapter.url});
+    await uiProxy.start();
+    if (process.env.LONGMAO_NO_BROWSER !== '1') {
+      await openBrowser(uiProxy.url);
+      console.log(`Totoro UI opened: ${uiProxy.origin}`);
+    } else {
+      console.log(`Totoro UI ready (browser launch disabled): ${uiProxy.origin}`);
+    }
     if (!status.wmpfDebugger) {
       if (status.cdpPort) throw new Error('CDP_PORT_OCCUPIED_BY_UNKNOWN_PROCESS');
       wmpfProcess = startWmpfDebugger({root: wmpfRoot});
@@ -115,51 +124,74 @@ async function run() {
     }
     client = new CdpClient();
     const observer = new WmpfObserver(client);
-    const controller = new BridgeController({observer, adapter, mode: 'native'});
+    const controller = new BridgeController({observer, adapter, mode: 'disabled'});
     controller.start();
-    const completed = new Promise((resolveDone, rejectDone) => {
-      controller.once('completed', resolveDone);
-      controller.once('failed', () => rejectDone(new Error('TOTORO_WORKFLOW_FAILED')));
+    let firstCredentialCaptured = false;
+    const onCredential = token => {
+      uiProxy.offerCredential(token);
+      if (!firstCredentialCaptured) {
+        firstCredentialCaptured = true;
+        resolveFirstCredential();
+      }
+    };
+    let resolveFirstCredential;
+    const credentialCaptured = new Promise(resolveCredential => {
+      resolveFirstCredential = resolveCredential;
     });
+    observer.on('credential', onCredential);
+    const dashboardReady = new Promise(resolveReady => uiProxy.once('dashboardReady', resolveReady));
     const onStatus = current => {
       if (!current.lastEventType) return;
       controller.removeListener('status', onStatus);
       console.log(`miniapp target detected (${current.lastEventType})`);
     };
     controller.on('status', onStatus);
-    const runtimeReady = new Promise(resolveReady => client.once('ready', resolveReady));
+    client.once('ready', () => {
+      console.log('runtime attached');
+      console.log('network observer active');
+    });
     await client.connect();
     console.log('WMPF connected');
-    console.log('Waiting for miniapp runtime event...');
+    console.log('Waiting for authenticated Totoro miniapp request...');
     await within([
-      runtimeReady,
-      completed,
-      aborted,
+      credentialCaptured,
+      interrupted,
       wmpfExited,
-    ], 300000, 'MINIAPP_EVENT_TIMEOUT');
-    console.log('runtime attached');
-    console.log('network observer active');
-    const result = await within([
-      completed,
-      aborted,
+    ], 300000, 'MINIAPP_CREDENTIAL_TIMEOUT');
+    console.log('credential detected and held in memory');
+    await within([
+      dashboardReady,
+      interrupted,
       wmpfExited,
-    ], 60000, 'TOTORO_WORKFLOW_TIMEOUT');
+    ], 60000, 'TOTORO_UI_HANDOFF_TIMEOUT');
+    observer.removeListener('credential', onCredential);
     const report = {
-      schemaVersion: 1, mode: 'real-wmpf-native-totoro', ok: true, startedAt,
-      finishedAt: new Date().toISOString(), upstreamTransport: 'loopback-only', credentialValue: 'never persisted',
-      credentialPresent: result.session.credentialPresent, session: result.session, totoro: result.result,
+      schemaVersion: 1, mode: 'real-wmpf-native-totoro-ui', ok: true, startedAt,
+      finishedAt: new Date().toISOString(), upstreamTransport: 'Totoro native behavior', credentialValue: 'not persisted by longmao',
+      credentialPresent: true, session: controller.context.snapshot(), totoro: {mode: 'native-next-dashboard', url: uiProxy.origin},
     };
     await saveReport(report);
-    console.log('Pipeline completed');
+    console.log('Credential handed to Totoro; dashboard ready');
     console.log('Sanitized report: artifacts/integration-report.json');
+    console.log('Press Ctrl+C to stop the local product.');
+    await stopped;
+  } catch (error) {
+    primaryError = error;
   } finally {
     process.removeListener('SIGINT', onSignal);
     process.removeListener('SIGTERM', onSignal);
-    client?.close();
-    await adapter?.close();
-    await backend.close().catch(() => {});
-    await stopProcessTree(wmpfProcess);
+    const cleanup = await Promise.allSettled([
+      Promise.resolve().then(() => client?.close()),
+      Promise.resolve().then(() => uiProxy?.close()),
+      Promise.resolve().then(() => adapter?.close()),
+      Promise.resolve().then(() => stopProcessTree(wmpfProcess)),
+    ]);
+    const failures = cleanup.filter(result => result.status === 'rejected').map(result => result.reason);
+    if (failures.length) {
+      primaryError = new AggregateError(primaryError ? [primaryError, ...failures] : failures, 'INTEGRATION_CLEANUP_FAILED');
+    }
   }
+  if (primaryError) throw primaryError;
 }
 
 try {

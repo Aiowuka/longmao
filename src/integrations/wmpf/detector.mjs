@@ -66,7 +66,7 @@ export async function detectIntegrationPrerequisites({port = 62000} = {}) {
   };
 }
 
-export function startWmpfDebugger({root, autoDetect = true} = {}) {
+export function startWmpfDebugger({root, autoDetect = false} = {}) {
   if (!root) throw new Error('WMPF_ROOT_REQUIRED');
   const tsNode = resolve(root, 'node_modules/ts-node/dist/bin.js');
   if (!existsSync(tsNode)) throw new Error('WMPFDEBUGGER_DEPENDENCIES_MISSING');
