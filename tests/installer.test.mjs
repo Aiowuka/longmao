@@ -218,3 +218,18 @@ test('supervisor self-heals the known legacy Linux scene pointer bug', async () 
   assert.match(source, /remoteDebugConfigPtr\.add\(structOffsets\[5\]\)/);
   assert.match(source, /sed -i/);
 });
+
+
+test('safe miniapp diagnostics overlay upgrades existing WMPF routing patches', async () => {
+  const patcher = await read('patches/wmpf-debugger/apply-miniapp-diagnostics.mjs');
+  assert.match(patcher, /LONGMAO_WMPF_MINIAPP_DIAGNOSTICS_V1/);
+  assert.match(patcher, /Longmao\.getMiniappMessages/);
+  assert.match(patcher, /recentMiniappMessages/);
+  assert.match(patcher, /Object\.keys\(data\)/);
+
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /apply-miniapp-diagnostics\.mjs/);
+    assert.match(source, /node "\$diagnostics_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
+  }
+});
