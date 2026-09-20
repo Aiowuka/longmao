@@ -33,9 +33,9 @@ if [[ -r /proc/sys/kernel/yama/ptrace_scope ]]; then
     warn "Linux ptrace_scope=$ptrace_scope；Frida 可能无法附加 WeChatAppEx。可临时执行: sudo sysctl -w kernel.yama.ptrace_scope=0"
   fi
 fi
-start_managed wmpf-debugger "$LONGMAO_WMPF" "npx ts-node src/index.ts"
-if ! wait_port 62000 12; then
-  warn 'WMPF CDP 62000 暂未就绪。请确认 Linux 微信/WMPF 版本受上游支持，并打开一个小程序。'
+start_managed wmpf-debugger "$LONGMAO_INSTALL_ROOT_RESOLVED" "'$SCRIPT_DIR/wmpf-supervisor.sh'"
+if ! wait_port 62000 2; then
+  warn 'WMPF supervisor 已启动；CDP 62000 会在检测到 WeChatAppEx 后自动就绪。'
 fi
 
 say '启动 Longmao'
