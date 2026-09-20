@@ -26,7 +26,9 @@ checkout() {
 
 apply_wmpf_patches() {
   local patch_file="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/0001-fix-legacy-scene-pointer.patch"
+  local jscontext_patcher="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/apply-jscontext-routing.mjs"
   [[ -f "$patch_file" ]] || die "WMPFDebugger 补丁缺失: $patch_file"
+  [[ -f "$jscontext_patcher" ]] || die "WMPFDebugger JSContext 补丁器缺失: $jscontext_patcher"
   if grep -q 'remoteDebugParametersPtr.add(structOffsets\[5\])' "$LONGMAO_WMPF/frida/hook.js"; then
     git -C "$LONGMAO_WMPF" apply --check "$patch_file"
     git -C "$LONGMAO_WMPF" apply "$patch_file"
@@ -35,6 +37,7 @@ apply_wmpf_patches() {
   else
     die 'WMPFDebugger hook.js 与预期不一致，拒绝静默打补丁。'
   fi
+  node "$jscontext_patcher" "$LONGMAO_WMPF/src/index.ts"
 }
 
 say '修复 Totoro'
