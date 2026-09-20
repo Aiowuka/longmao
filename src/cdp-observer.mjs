@@ -98,6 +98,9 @@ export class CdpObserver {
     this.storageKeys = [];
     this.executionContexts = new Map();
     this.wxContextId = null;
+    this.wmpfJsContexts = new Map();
+    this.wmpfJsContextId = null;
+    this.wmpfRoutingAvailable = null;
   }
 
   status() {
@@ -123,6 +126,9 @@ export class CdpObserver {
       storageKeys: [...this.storageKeys],
       runtimeContextCount: this.executionContexts.size,
       wxContextId: this.wxContextId,
+      wmpfRoutingAvailable: this.wmpfRoutingAvailable,
+      wmpfJsContextId: this.wmpfJsContextId,
+      wmpfJsContexts: [...this.wmpfJsContexts.values()].map(context => ({...context})),
     };
   }
 
@@ -252,6 +258,9 @@ export class CdpObserver {
     this.instrumented = false;
     this.executionContexts.clear();
     this.wxContextId = null;
+    this.wmpfJsContexts.clear();
+    this.wmpfJsContextId = null;
+    this.wmpfRoutingAvailable = null;
     this.storageKeys = [];
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -328,6 +337,67 @@ export class CdpObserver {
     }, this.authRetryIntervalMs);
   }
 
+  async _refreshWmpfJsContexts() {
+    if (this.wmpfRoutingAvailable === false) return [];
+    let result;
+    try {
+      result = await this.command('Longmao.getJsContexts');
+    } catch (error) {
+      if (error?.code === 'CDP_COMMAND_ERROR') this.wmpfRoutingAvailable = false;
+      return [];
+    }
+
+    const contexts = Array.isArray(result?.contexts)
+      ? result.contexts
+          .filter(item => item && typeof item.id === 'string' && item.id)
+          .map(item => ({
+            id: item.id,
+            name: typeof item.name === 'string' ? item.name : '',
+          }))
+      : [];
+
+    const before = JSON.stringify([...this.wmpfJsContexts.values()]);
+    this.wmpfJsContexts = new Map(contexts.map(context => [context.id, context]));
+    this.wmpfRoutingAvailable = true;
+    if (typeof result?.activeId === 'string' && result.activeId) {
+      this.wmpfJsContextId = result.activeId;
+    }
+    const after = JSON.stringify(contexts);
+    if (before !== after) {
+      this._record({
+        kind: 'wmpf_jscontexts',
+        count: contexts.length,
+        contexts: contexts.map(context => ({
+          id: context.id,
+          name: context.name || null,
+        })),
+      });
+    }
+    return contexts;
+  }
+
+  async _activateWmpfJsContext(context) {
+    if (!context?.id) return false;
+    await this.command('Longmao.connectJsContext', {id: context.id});
+    this.wmpfRoutingAvailable = true;
+    this.wmpfJsContextId = context.id;
+    this.executionContexts.clear();
+    this.wxContextId = null;
+    this.storageKeys = [];
+    this._record({
+      kind: 'wmpf_jscontext_selected',
+      id: context.id,
+      name: context.name || null,
+    });
+
+    const results = await Promise.allSettled([
+      this.command('Runtime.enable'),
+      this.command('Network.enable'),
+      this.command('Page.enable'),
+    ]);
+    return results.some(result => result.status === 'fulfilled');
+  }
+
   _contextIds() {
     const ids = [...this.executionContexts.keys()];
     if (Number.isInteger(this.wxContextId)) {
@@ -356,6 +426,40 @@ export class CdpObserver {
   }
 
   async _findWxState() {
+    const wmpfContexts = await this._refreshWmpfJsContexts();
+    if (wmpfContexts.length > 0) {
+      const ordered = [...wmpfContexts].sort((a, b) => {
+        if (a.id === this.wmpfJsContextId) return -1;
+        if (b.id === this.wmpfJsContextId) return 1;
+        return 0;
+      });
+
+      for (const context of ordered) {
+        try {
+          await this._activateWmpfJsContext(context);
+          const state = await this._readWxState(null);
+          if (!state) continue;
+          this.storageKeys = [...state.keys];
+          this._record({
+            kind: 'wx_context_found',
+            contextId: null,
+            jscontextId: context.id,
+            name: context.name || null,
+            origin: null,
+            storageKeyCount: state.keys.length,
+          });
+          return {...state, jscontextId: context.id};
+        } catch (error) {
+          this._record({
+            kind: 'wmpf_jscontext_probe_failed',
+            id: context.id,
+            name: context.name || null,
+            code: error?.code || 'WMPF_JSCONTEXT_PROBE_FAILED',
+          });
+        }
+      }
+    }
+
     const candidates = this._contextIds();
     if (candidates.length === 0) candidates.push(null);
 
@@ -381,6 +485,7 @@ export class CdpObserver {
         this._record({
           kind: 'wx_context_found',
           contextId: state.contextId,
+          jscontextId: null,
           name: meta?.name || null,
           origin: meta?.origin || null,
           storageKeyCount: state.keys.length,
@@ -449,6 +554,41 @@ export class CdpObserver {
     }
 
     const params = message.params || {};
+
+    if (message.method === 'Longmao.jsContextAdded') {
+      const id = typeof params.id === 'string' ? params.id : '';
+      if (id) {
+        const context = {id, name: typeof params.name === 'string' ? params.name : ''};
+        this.wmpfJsContexts.set(id, context);
+        this.wmpfRoutingAvailable = true;
+        this._record({kind: 'wmpf_jscontext_added', id, name: context.name || null});
+        if (this.instrumented && !this.token) {
+          queueMicrotask(() => this.captureStoredToken().catch(() => {}));
+        }
+      }
+      return true;
+    }
+
+    if (message.method === 'Longmao.jsContextRemoved') {
+      const id = typeof params.id === 'string' ? params.id : '';
+      if (id) {
+        this.wmpfJsContexts.delete(id);
+        if (this.wmpfJsContextId === id) this.wmpfJsContextId = null;
+        this._record({kind: 'wmpf_jscontext_removed', id});
+      }
+      return true;
+    }
+
+    if (message.method === 'Longmao.jsContextConnected') {
+      const id = typeof params.id === 'string' ? params.id : '';
+      if (id) {
+        this.wmpfJsContextId = id;
+        this.wmpfRoutingAvailable = true;
+        this._record({kind: 'wmpf_jscontext_connected', id});
+      }
+      return true;
+    }
+
     if (message.method === 'Network.requestWillBeSent') {
       const request = params.request || {};
       let observedUrl = null;
