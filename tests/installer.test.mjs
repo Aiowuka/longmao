@@ -293,7 +293,7 @@ test('WMPF overlay patchers emit real source newlines when applied', async () =>
       'const debugMessageEmitter = { emit() {} };',
       'const logger = { info() {} };',
       'const jsContexts = new Map<string, string>();',
-      'let activeJsContextId = "";',
+      '    let activeJsContextId = "";',
       'function onMessage(unwrappedData: any) {',
       '        if (unwrappedData.category === "addJsContext") {',
       '            return;',
