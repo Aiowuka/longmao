@@ -143,7 +143,7 @@ test('public curl bootstrap pins a tested public source snapshot', async () => {
 
 test('Linux managed processes inherit the Longmao private runtime PATH', async () => {
   const source = await read('scripts/linux/common.sh');
-  assert.match(source, /nohup bash -c "exec \$command"/);
+  assert.match(source, /nohup bash -c "\$command"/);
   assert.doesNotMatch(source, /nohup bash -lc/);
   assert.match(source, /export PATH="\$LONGMAO_NODE_ROOT\/bin:\$LONGMAO_BIN_ROOT_RESOLVED:\$PATH"/);
 });
