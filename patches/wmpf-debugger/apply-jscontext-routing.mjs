@@ -17,6 +17,7 @@ source = source.replace(counterNeedle, `    let messageCounter = 0;
     // The upstream protobuf already carries addJsContext/connectJsContext/jscontext_id,
     // but the stock proxy drops those signals and sends CDP with an empty jscontext_id.
     const jsContexts = new Map<string, string>();
+    const recentMiniappMessages: Array<{ category: string; keys: string[] }> = [];
     let activeJsContextId = "";
 `);
 
@@ -29,6 +30,18 @@ const messageNeedle = `        if (unwrappedData === null) {
 if (!source.includes(messageNeedle)) throw new Error('WMPF index.ts onMessage marker not found');
 source = source.replace(messageNeedle, `        if (unwrappedData === null) {
             return;
+        }
+
+        const safeCategory = String(unwrappedData.category ?? "");
+        if (safeCategory) {
+            const data = unwrappedData.data && typeof unwrappedData.data === "object"
+                ? unwrappedData.data
+                : {};
+            recentMiniappMessages.push({
+                category: safeCategory,
+                keys: Object.keys(data).sort().slice(0, 24),
+            });
+            if (recentMiniappMessages.length > 120) recentMiniappMessages.shift();
         }
 
         if (unwrappedData.category === "addJsContext") {
@@ -121,6 +134,25 @@ source = source.replace(proxyNeedle, `    debugMessageEmitter.on("proxymessage",
                     result: {
                         contexts: Array.from(jsContexts.entries()).map(([id, name]) => ({ id, name })),
                         activeId: activeJsContextId || null,
+                    },
+                }));
+            }
+            return;
+        }
+
+        if (parsed?.method === "Longmao.getMiniappMessages") {
+            if (Number.isInteger(parsed.id)) {
+                const counts = new Map<string, number>();
+                for (const item of recentMiniappMessages) {
+                    counts.set(item.category, (counts.get(item.category) || 0) + 1);
+                }
+                debugMessageEmitter.emit("cdpmessage", JSON.stringify({
+                    id: parsed.id,
+                    result: {
+                        recent: recentMiniappMessages.slice(-60),
+                        categoryCounts: Array.from(counts.entries())
+                            .map(([category, count]) => ({ category, count }))
+                            .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category)),
                     },
                 }));
             }
