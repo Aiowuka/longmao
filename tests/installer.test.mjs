@@ -162,3 +162,13 @@ test('Linux WMPF launch uses upstream Linux version configs instead of Windows a
   assert.doesNotMatch(source, /src\/index\.ts --auto-detect/);
   assert.match(source, /ptrace_scope/);
 });
+
+
+test('WMPFDebugger dependencies follow upstream Yarn lockfile', async () => {
+  const install = await read('scripts/linux/install.sh');
+  const repair = await read('scripts/linux/repair.sh');
+  for (const source of [install, repair]) {
+    assert.match(source, /yarn@1\.22\.22 install --frozen-lockfile/);
+    assert.doesNotMatch(source, /\bnpm install\b/);
+  }
+});

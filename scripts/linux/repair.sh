@@ -36,7 +36,8 @@ say '修复 WMPFDebugger'
 checkout "$WMPF_REPO" "$WMPF_COMMIT" "$LONGMAO_WMPF"
 (
   cd "$LONGMAO_WMPF"
-  npm install
+  rm -rf node_modules package-lock.json
+  npx --yes yarn@1.22.22 install --frozen-lockfile
 )
 
 if [[ -f "$LONGMAO_CONFIG_FILE" ]]; then

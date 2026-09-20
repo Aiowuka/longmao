@@ -162,7 +162,8 @@ say '安装 Totoro 依赖'
 say '安装 WMPFDebugger 依赖'
 (
   cd "$LONGMAO_WMPF"
-  npm install
+  rm -rf node_modules package-lock.json
+  npx --yes yarn@1.22.22 install --frozen-lockfile
 )
 
 if [[ ! -f "$LONGMAO_CONFIG_FILE" ]]; then
