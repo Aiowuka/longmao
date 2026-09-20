@@ -22,6 +22,8 @@ checkout() {
   fi
   git -C "$dest" fetch origin "$commit" --depth 1
   git -C "$dest" checkout --detach --force "$commit"
+  git -C "$dest" reset --hard "$commit"
+  git -C "$dest" clean -fdx
 }
 
 apply_wmpf_patches() {
