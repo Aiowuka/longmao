@@ -1,21 +1,57 @@
 # 验证记录
 
-日期：2026-09-15。执行环境：Linux，Node.js v22.16.0，npm 10.9.2。
+日期：2026-09-20。
 
-执行命令：`npm run reproduce`。
+目标提交（业务重构）：`97cbc839737ee56fb83bec098ccf566a388b4983`
+
+GitHub Actions：
 
 ```text
-tests 31
-pass 31
-fail 0
-cancelled 0
-skipped 0
+https://github.com/Aiowuka/longmao/actions/runs/35502793537
 ```
 
-成功场景六个阶段全部完成，输出 `mode: offline-mock`、`ok: true`。
-`expired-session` 与 `rejected-submission` 场景的 CLI 返回码均为 1，报告状态与错误码均通过测试。
+矩阵结果：
 
-这些结果仅证明独立本地模拟、输入检查、幂等和命令行行为通过测试。
-未运行微信、WMPFDebugger 或 Totoro；未抓取任何登录凭据；未访问真实业务后端。
-Windows 启动脚本未在本次 Linux 环境执行；跨平台结果应以该提交对应的 GitHub Actions 为准。
-此记录不预先宣称 CI 已通过。
+```text
+Ubuntu  / Node 22  success
+Ubuntu  / Node 24  success
+Windows / Node 22  success
+Windows / Node 24  success
+```
+
+其中 Ubuntu / Node 22 的 `npm test`：
+
+```text
+tests 51
+pass 51
+fail 0
+```
+
+随后 `npm run demo` 成功完成离线 Mock 六阶段流程。
+
+## 本次验证覆盖
+
+- Longmao 原离线 Mock 回归。
+- 来源/sidecar integration metadata。
+- Web loopback-only 绑定与 CSP。
+- Totoro 未配置时 fail closed。
+- Totoro base URL 必须为 loopback。
+- CDP 只从配置 capture origin 捕获 Token。
+- Totoro adapter 固定调用原生 API：
+  - `/api/login/token`
+  - `/api/sunrun/tasks`
+  - `/api/sunrun/preview`
+  - `/api/sunrun/start`
+  - `/api/sunrun/run-job`
+- Totoro 原生 payload contract。
+- Longmao 不提供 arbitrary upstream path。
+- Totoro 返回 profile 中即使带 token，Longmao public state 也不会返回该字段。
+- Linux / Windows 跨平台 Node 22 / 24。
+
+## 尚未覆盖
+
+CI 没有启动真实微信、WMPFDebugger、Redis、Totoro dev server 或用户自有后台。
+
+因此当前结论是：
+
+**Longmao 的 sidecar adapter、边界与 contract tests 已通过；真实 WMPF + Totoro + 用户后台仍需要在用户电脑做一次实机联调。**
