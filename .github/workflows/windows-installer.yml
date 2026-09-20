@@ -1,0 +1,67 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/windows-one-click-installer
+    paths:
+      - 'scripts/windows/**'
+      - 'installer/windows/**'
+      - 'Longmao *.cmd'
+      - 'Install Longmao.cmd'
+      - 'src/**'
+      - 'web/**'
+      - 'package.json'
+      - '.github/workflows/windows-installer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run Longmao tests
+        run: npm test
+
+      - name: Parse PowerShell installer scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem scripts/windows/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "Parse errors in $($_.Name)" -ForegroundColor Red
+              $errors | ForEach-Object { Write-Host $_.Message }
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: ./installer/windows/build.ps1 -Version 0.5.0
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: LongmaoSetup-0.5.0-win-x64
+          path: installer/windows/output/LongmaoSetup-0.5.0-win-x64.exe
+          if-no-files-found: error
+          retention-days: 30
