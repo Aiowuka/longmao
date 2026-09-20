@@ -45,9 +45,15 @@ function renderWmpf(wmpf) {
 
 function renderCdp(cdp) {
   if (!cdp) return;
-  badge($('#cdp-badge'), cdp.connected ? (cdp.instrumented ? '已接入' : '已连接') : cdp.state,
+  const waitingTarget = cdp.connected && !cdp.instrumented && cdp.targetRetrying;
+  badge($('#cdp-badge'),
+    cdp.connected ? (cdp.instrumented ? '已接入' : (waitingTarget ? '等待小程序' : '已连接')) : cdp.state,
     cdp.connected ? (cdp.instrumented ? 'safe' : 'warn') : 'neutral');
-  $('#cdp-instrumented').textContent = cdp.instrumented ? 'Network / Runtime / Page' : (cdp.lastError || '否');
+  $('#cdp-instrumented').textContent = cdp.instrumented
+    ? 'Network / Runtime / Page'
+    : (waitingTarget
+      ? `等待小程序目标 · 自动重试 ${cdp.targetRetryCount || 0}/${cdp.targetRetryLimit || 0}`
+      : (cdp.lastError || '否'));
   $('#capture-origin').textContent = cdp.captureOrigin || '—';
   $('#cdp-event-count').textContent = String(cdp.eventCount || 0);
   $('#cdp-token').textContent = cdp.auth?.present
@@ -218,6 +224,8 @@ function renderEvents(events) {
     else if (event.kind === 'auth_captured') detail.textContent = `${event.source} · ${event.tokenLength} chars`;
     else if (event.kind === 'console') detail.textContent = `${event.level} · args ${event.argumentCount}`;
     else if (event.kind === 'navigation') detail.textContent = event.url || '';
+    else if (event.kind === 'cdp_instrument_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
+    else if (event.kind === 'cdp_instrumented') detail.textContent = 'Network / Runtime / Page ready';
     else detail.textContent = event.code || '';
     const time = document.createElement('time');
     time.textContent = event.at ? new Date(event.at).toLocaleTimeString() : '';

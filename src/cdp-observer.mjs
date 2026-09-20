@@ -57,6 +57,8 @@ export class CdpObserver {
     wsFactory = null,
     commandTimeoutMs = 2000,
     maxEvents = 300,
+    targetRetryIntervalMs = 1000,
+    targetRetryAttempts = 30,
   } = {}) {
     this.captureConfig = captureConfig;
     this.url = url;
@@ -66,9 +68,16 @@ export class CdpObserver {
     });
     this.commandTimeoutMs = commandTimeoutMs;
     this.maxEvents = maxEvents;
+    this.targetRetryIntervalMs = targetRetryIntervalMs;
+    this.targetRetryLimit = targetRetryAttempts;
+    this.targetRetryTimer = null;
+    this.targetRetryCount = 0;
     this.socket = null;
     this.state = 'disconnected';
     this.instrumented = false;
+    if (this.targetRetryTimer) clearTimeout(this.targetRetryTimer);
+    this.targetRetryTimer = null;
+    this.targetRetryCount = 0;
     this.lastError = null;
     this.nextId = 1;
     this.pending = new Map();
@@ -90,6 +99,11 @@ export class CdpObserver {
       captureOrigin: this.captureConfig?.origin || null,
       lastError: this.lastError,
       filtersActive: Boolean(this.captureConfig),
+      targetRetrying: Boolean(this.targetRetryTimer) ||
+        (this.state === 'connected' && !this.instrumented &&
+          this.targetRetryCount > 0 && this.targetRetryCount < this.targetRetryLimit),
+      targetRetryCount: this.targetRetryCount,
+      targetRetryLimit: this.targetRetryLimit,
     };
   }
 
@@ -199,6 +213,7 @@ export class CdpObserver {
     });
 
     this.state = 'connected';
+    this.targetRetryCount = 0;
     this._record({kind: 'cdp_connected'});
     await this.instrument();
     return this.status();
@@ -219,6 +234,25 @@ export class CdpObserver {
     return this.status();
   }
 
+  _scheduleInstrumentationRetry() {
+    if (this.targetRetryTimer || this.instrumented || this.state !== 'connected') return;
+    if (this.targetRetryCount >= this.targetRetryLimit) return;
+
+    this.targetRetryTimer = setTimeout(async () => {
+      this.targetRetryTimer = null;
+      if (this.instrumented || this.state !== 'connected') return;
+      this.targetRetryCount += 1;
+      this._record({
+        kind: 'cdp_instrument_retry',
+        attempt: this.targetRetryCount,
+        limit: this.targetRetryLimit,
+      });
+      try {
+        await this.instrument();
+      } catch {}
+    }, this.targetRetryIntervalMs);
+  }
+
   async instrument() {
     if (!this.socket || this.socket.readyState !== 1) {
       this.instrumented = false;
@@ -230,7 +264,16 @@ export class CdpObserver {
       this.command('Page.enable'),
     ]);
     this.instrumented = results.every(result => result.status === 'fulfilled');
-    this.lastError = this.instrumented ? null : 'CDP_TARGET_NOT_RESPONDING';
+    if (this.instrumented) {
+      this.lastError = null;
+      if (this.targetRetryTimer) clearTimeout(this.targetRetryTimer);
+      this.targetRetryTimer = null;
+      this.targetRetryCount = 0;
+      this._record({kind: 'cdp_instrumented'});
+    } else {
+      this.lastError = 'CDP_TARGET_NOT_RESPONDING';
+      this._scheduleInstrumentationRetry();
+    }
     return this.status();
   }
 

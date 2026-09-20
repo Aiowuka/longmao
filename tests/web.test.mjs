@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {startWebServer} from '../src/web.mjs';
+import {CdpObserver} from '../src/cdp-observer.mjs';
 import {DEFAULT_WMPF_PORTS, resolveWmpfPorts} from '../src/wmpf-bridge.mjs';
 
 let server;
@@ -89,4 +90,63 @@ test('web API rejects generic replay routes and arbitrary upstream routes', asyn
 
 test('web server refuses non-loopback bind requests', async () => {
   await assert.rejects(() => startWebServer({host: '0.0.0.0', port: 0}), {code: 'LOOPBACK_BIND_REQUIRED'});
+});
+
+
+test('CDP observer retries instrumentation until the miniapp target responds', async () => {
+  class FakeSocket {
+    constructor() {
+      this.readyState = 0;
+      this.listeners = new Map();
+      this.sendCount = 0;
+      queueMicrotask(() => {
+        this.readyState = 1;
+        this.emit('open', {});
+      });
+    }
+
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+
+    send(raw) {
+      const message = JSON.parse(raw);
+      this.sendCount += 1;
+      if (this.sendCount <= 3) return;
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result: {}})}));
+    }
+
+    close() {
+      this.readyState = 3;
+      this.emit('close', {});
+    }
+  }
+
+  const socket = new FakeSocket();
+  const observer = new CdpObserver({
+    wsFactory: () => socket,
+    commandTimeoutMs: 15,
+    targetRetryIntervalMs: 5,
+    targetRetryAttempts: 5,
+  });
+
+  const first = await observer.connect();
+  assert.equal(first.connected, true);
+  assert.equal(first.instrumented, false);
+  assert.equal(first.targetRetrying, true);
+
+  await new Promise(resolve => setTimeout(resolve, 80));
+  const final = observer.status();
+  assert.equal(final.instrumented, true);
+  assert.equal(final.lastError, null);
+  assert.equal(final.targetRetryCount, 0);
+  assert.ok(observer.events().some(event => event.kind === 'cdp_instrument_retry'));
+  assert.ok(observer.events().some(event => event.kind === 'cdp_instrumented'));
+  observer.disconnect();
 });
