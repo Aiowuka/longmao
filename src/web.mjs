@@ -282,6 +282,34 @@ export function createAppHandler({
   };
 }
 
+export function startCdpAutoConnect(cdpObserver, {intervalMs = 1500} = {}) {
+  if (!cdpObserver) return () => {};
+  let stopped = false;
+  let inFlight = false;
+
+  const attempt = async () => {
+    if (stopped || inFlight) return;
+    const status = cdpObserver.status();
+    if (status.connected || status.state === 'connecting') return;
+    inFlight = true;
+    try {
+      await cdpObserver.connect();
+    } catch {
+      // WMPF/CDP may not exist yet; the next interval retries automatically.
+    } finally {
+      inFlight = false;
+    }
+  };
+
+  const timer = setInterval(attempt, intervalMs);
+  timer.unref?.();
+  queueMicrotask(attempt);
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+  };
+}
+
 export function startWebServer({
   host = '127.0.0.1',
   port = 3210,
@@ -322,6 +350,7 @@ async function main() {
   const totoroState = await loadTotoroConfig({root});
   const cdpObserver = new CdpObserver({captureConfig: totoroState.config?.capture || null});
   const totoroClient = totoroState.config ? new TotoroClient(totoroState.config) : null;
+  const stopCdpAutoConnect = startCdpAutoConnect(cdpObserver);
   const started = await startWebServer({
     port: parseConfiguredPort(process.env.LONGMAO_WEB_PORT),
     cdpObserver,
@@ -339,6 +368,7 @@ async function main() {
   console.log('Business logic is delegated to Totoro; Longmao only orchestrates WMPF/CDP + Totoro HTTP APIs.');
 
   const shutdown = () => {
+    stopCdpAutoConnect();
     cdpObserver.disconnect();
     started.server.close(() => process.exit(0));
   };
