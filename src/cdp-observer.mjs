@@ -101,6 +101,8 @@ export class CdpObserver {
     this.wmpfJsContexts = new Map();
     this.wmpfJsContextId = null;
     this.wmpfRoutingAvailable = null;
+    this.capabilityMode = 'UNKNOWN';
+    this.networkDebugSource = null;
   }
 
   status() {
@@ -129,6 +131,9 @@ export class CdpObserver {
       wmpfRoutingAvailable: this.wmpfRoutingAvailable,
       wmpfJsContextId: this.wmpfJsContextId,
       wmpfJsContexts: [...this.wmpfJsContexts.values()].map(context => ({...context})),
+      capabilityMode: this.capabilityMode,
+      networkDebugSource: this.networkDebugSource,
+      runtimeAvailable: this.capabilityMode === 'FULL_RUNTIME',
     };
   }
 
@@ -144,7 +149,7 @@ export class CdpObserver {
   clearAuth() {
     this.token = null;
     this.authRetryCount = 0;
-    if (this.instrumented) this._scheduleAuthRetry();
+    if (this.instrumented && this.capabilityMode !== 'NETWORK_ONLY') this._scheduleAuthRetry();
     return this.status();
   }
 
@@ -156,6 +161,28 @@ export class CdpObserver {
   _record(event) {
     this.timeline.push({at: new Date().toISOString(), ...event});
     if (this.timeline.length > this.maxEvents) this.timeline.splice(0, this.timeline.length - this.maxEvents);
+  }
+
+  _setCapabilityMode(mode, details = {}) {
+    if (this.capabilityMode === mode &&
+        (mode !== 'NETWORK_ONLY' || this.networkDebugSource === (details.source || this.networkDebugSource))) {
+      return;
+    }
+    this.capabilityMode = mode;
+    if (mode === 'NETWORK_ONLY') {
+      this.networkDebugSource = details.source || this.networkDebugSource || 'network-debug';
+      if (this.authRetryTimer) clearTimeout(this.authRetryTimer);
+      this.authRetryTimer = null;
+      this.authRetryCount = 0;
+      this.storageKeys = [];
+    } else if (mode === 'FULL_RUNTIME') {
+      this.networkDebugSource = null;
+    }
+    this._record({
+      kind: 'cdp_capability_mode',
+      mode,
+      source: details.source || null,
+    });
   }
 
   _allowedUrl(rawUrl) {
@@ -261,6 +288,8 @@ export class CdpObserver {
     this.wmpfJsContexts.clear();
     this.wmpfJsContextId = null;
     this.wmpfRoutingAvailable = null;
+    this.capabilityMode = 'UNKNOWN';
+    this.networkDebugSource = null;
     this.storageKeys = [];
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -310,7 +339,7 @@ export class CdpObserver {
         this._record({kind: 'auth_storage_capture_failed', code: error?.code || 'CDP_STORAGE_READ_FAILED'});
         return false;
       });
-      if (!captured && !this.token) this._scheduleAuthRetry();
+      if (!captured && !this.token && this.capabilityMode !== 'NETWORK_ONLY') this._scheduleAuthRetry();
     } else {
       this.lastError = 'CDP_TARGET_NOT_RESPONDING';
       this._scheduleInstrumentationRetry();
@@ -319,12 +348,14 @@ export class CdpObserver {
   }
 
   _scheduleAuthRetry() {
-    if (this.authRetryTimer || this.token || !this.instrumented || this.state !== 'connected') return;
+    if (this.authRetryTimer || this.token || !this.instrumented || this.state !== 'connected' ||
+        this.capabilityMode === 'NETWORK_ONLY') return;
     if (this.authRetryCount >= this.authRetryLimit) return;
 
     this.authRetryTimer = setTimeout(async () => {
       this.authRetryTimer = null;
-      if (this.token || !this.instrumented || this.state !== 'connected') return;
+      if (this.token || !this.instrumented || this.state !== 'connected' ||
+          this.capabilityMode === 'NETWORK_ONLY') return;
       this.authRetryCount += 1;
       this._record({kind: 'auth_storage_retry', attempt: this.authRetryCount, limit: this.authRetryLimit});
       try {
@@ -427,6 +458,10 @@ export class CdpObserver {
 
   async _findWxState() {
     const wmpfContexts = await this._refreshWmpfJsContexts();
+    if (this.capabilityMode === 'NETWORK_ONLY' && wmpfContexts.length === 0 &&
+        this.executionContexts.size === 0) {
+      return null;
+    }
     if (wmpfContexts.length > 0) {
       const ordered = [...wmpfContexts].sort((a, b) => {
         if (a.id === this.wmpfJsContextId) return -1;
@@ -440,6 +475,7 @@ export class CdpObserver {
           const state = await this._readWxState(null);
           if (!state) continue;
           this.storageKeys = [...state.keys];
+          this._setCapabilityMode('FULL_RUNTIME', {source: 'wmpf-jscontext'});
           this._record({
             kind: 'wx_context_found',
             contextId: null,
@@ -480,6 +516,7 @@ export class CdpObserver {
       const changed = this.wxContextId !== state.contextId;
       this.wxContextId = state.contextId;
       this.storageKeys = [...state.keys];
+      this._setCapabilityMode('FULL_RUNTIME', {source: 'runtime-context'});
       if (changed || !this.timeline.some(event => event.kind === 'wx_context_found')) {
         const meta = Number.isInteger(state.contextId) ? this.executionContexts.get(state.contextId) : null;
         this._record({
@@ -503,6 +540,8 @@ export class CdpObserver {
   }
 
   async captureStoredToken() {
+    if (this.capabilityMode === 'NETWORK_ONLY' && this.wmpfJsContexts.size === 0 &&
+        this.executionContexts.size === 0) return false;
     if (this.storageCaptureInFlight || !this.socket || this.socket.readyState !== 1 || !this.instrumented) {
       return false;
     }
@@ -555,12 +594,26 @@ export class CdpObserver {
 
     const params = message.params || {};
 
+    if (message.method === 'Longmao.networkDebugAvailable') {
+      const source = typeof params.source === 'string' ? params.source : 'network-debug';
+      if (this.wmpfJsContexts.size === 0 && this.executionContexts.size === 0 && !this.token) {
+        this._setCapabilityMode('NETWORK_ONLY', {source});
+      }
+      this._record({kind: 'network_debug_available', source});
+      return true;
+    }
+
     if (message.method === 'Longmao.jsContextAdded') {
       const id = typeof params.id === 'string' ? params.id : '';
       if (id) {
         const context = {id, name: typeof params.name === 'string' ? params.name : ''};
         this.wmpfJsContexts.set(id, context);
         this.wmpfRoutingAvailable = true;
+        if (this.capabilityMode === 'NETWORK_ONLY') {
+          this.capabilityMode = 'UNKNOWN';
+          this.networkDebugSource = null;
+          this._record({kind: 'cdp_capability_mode', mode: 'UNKNOWN', source: 'jscontext-added'});
+        }
         this._record({kind: 'wmpf_jscontext_added', id, name: context.name || null});
         if (this.instrumented && !this.token) {
           queueMicrotask(() => this.captureStoredToken().catch(() => {}));
