@@ -582,3 +582,39 @@ test('CDP observer can recover from network-only mode when a WMPF JSContext appe
   assert.equal(observer.status().capabilityMode, 'FULL_RUNTIME');
   assert.equal(observer.getToken(), 'recovered-runtime-token');
 });
+
+
+test('CDP observer records sanitized network-only metadata without credential material', () => {
+  const observer = new CdpObserver({
+    captureConfig: {
+      origin: 'https://capture.example',
+      pathPrefixes: ['/api/'],
+      requestHeaderNames: ['authorization'],
+      responseJsonPaths: ['token'],
+    },
+  });
+
+  observer.ingest({
+    method: 'Longmao.networkDebug',
+    params: {
+      source: '__networkDebug',
+      origin: 'https://capture.example',
+      path: '/api/login',
+      method: 'POST',
+      status: 200,
+      phase: 'response',
+      authorization: 'Bearer should-not-appear',
+      body: '{"token":"should-not-appear"}',
+      query: 'secret=should-not-appear',
+    },
+  });
+
+  const event = observer.events().find(item => item.kind === 'network_debug_meta');
+  assert.equal(event.origin, 'https://capture.example');
+  assert.equal(event.path, '/api/login');
+  assert.equal(event.method, 'POST');
+  assert.equal(event.status, 200);
+  assert.equal(event.phase, 'response');
+  assert.equal(event.matchedCaptureOrigin, true);
+  assert.doesNotMatch(JSON.stringify(event), /should-not-appear|authorization|body|query/i);
+});
