@@ -249,3 +249,18 @@ test('result-envelope jscontext inference supports Linux WeChat builds without a
     assert.match(source, /node "\$result_context_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
   }
 });
+
+
+test('network-only capability overlay detects Linux WeChat network debug channels', async () => {
+  const patcher = await read('patches/wmpf-debugger/apply-network-only-mode.mjs');
+  assert.match(patcher, /LONGMAO_WMPF_NETWORK_ONLY_MODE_V1/);
+  assert.match(patcher, /Longmao\.networkDebugAvailable/);
+  assert.match(patcher, /__networkDebug/);
+  assert.match(patcher, /networkDebugAPI/);
+
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /apply-network-only-mode\.mjs/);
+    assert.match(source, /node "\$network_only_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
+  }
+});
