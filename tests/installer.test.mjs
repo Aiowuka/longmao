@@ -117,7 +117,8 @@ test('Linux exposes one unified longmao subcommand CLI', async () => {
     assert.match(cli, new RegExp('\\b' + command.replace('-', '\\-') + '\\b'));
   }
   assert.match(cli, /Usage:/);
-  assert.match(cli, /Longmao 0\.5\.0/);
+  assert.match(cli, /VERSION='0\.5\.0'/);
+  assert.match(cli, /printf 'Longmao %s\\n' \"\$VERSION\"/);
 });
 
 test('Linux installer makes longmao the primary command and keeps legacy wrappers as aliases', async () => {
