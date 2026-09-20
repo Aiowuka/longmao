@@ -81,9 +81,6 @@ export class CdpObserver {
     this.socket = null;
     this.state = 'disconnected';
     this.instrumented = false;
-    this.executionContexts.clear();
-    this.wxContextId = null;
-    this.storageKeys = [];
     if (this.targetRetryTimer) clearTimeout(this.targetRetryTimer);
     if (this.authRetryTimer) clearTimeout(this.authRetryTimer);
     this.targetRetryTimer = null;
@@ -253,6 +250,9 @@ export class CdpObserver {
     this.socket = null;
     this.state = 'disconnected';
     this.instrumented = false;
+    this.executionContexts.clear();
+    this.wxContextId = null;
+    this.storageKeys = [];
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
       pending.reject(makeError('CDP_DISCONNECTED'));
