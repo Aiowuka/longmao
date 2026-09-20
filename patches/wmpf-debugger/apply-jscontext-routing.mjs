@@ -85,6 +85,17 @@ source = source.replace(messageNeedle, `        if (unwrappedData === null) {
         }
 
         if (unwrappedData.category === "chromeDevtoolsResult") {
+            const resultJsContextId = String(unwrappedData.data?.jscontext_id ?? "");
+            if (resultJsContextId && !jsContexts.has(resultJsContextId)) {
+                const inferredName = "inferred-from-chromeDevtoolsResult";
+                jsContexts.set(resultJsContextId, inferredName);
+                if (!activeJsContextId) activeJsContextId = resultJsContextId;
+                logger.info(\`[miniapp] inferred jscontext from chromeDevtoolsResult: id=\${resultJsContextId}\`);
+                debugMessageEmitter.emit("cdpmessage", JSON.stringify({
+                    method: "Longmao.jsContextAdded",
+                    params: { id: resultJsContextId, name: inferredName },
+                }));
+            }
 `);
 
 const proxyNeedle = `    debugMessageEmitter.on("proxymessage", (message: string) => {
