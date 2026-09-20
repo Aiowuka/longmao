@@ -34,8 +34,8 @@ jobs:
       - name: Run Longmao tests
         run: npm test
 
-      - name: Parse PowerShell installer scripts
-        shell: pwsh
+      - name: Parse PowerShell installer scripts with Windows PowerShell 5.1
+        shell: powershell
         run: |
           $failed = $false
           Get-ChildItem scripts/windows/*.ps1 | ForEach-Object {
