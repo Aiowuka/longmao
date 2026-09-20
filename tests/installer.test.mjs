@@ -154,3 +154,11 @@ test('Linux managed commands support leading environment assignments', async () 
   assert.match(source, /nohup bash -c "\$command"/);
   assert.doesNotMatch(source, /bash -c "exec \$command"/);
 });
+
+
+test('Linux WMPF launch uses upstream Linux version configs instead of Windows auto-detect', async () => {
+  const source = await read('scripts/linux/start.sh');
+  assert.match(source, /npx ts-node src\/index\.ts/);
+  assert.doesNotMatch(source, /src\/index\.ts --auto-detect/);
+  assert.match(source, /ptrace_scope/);
+});

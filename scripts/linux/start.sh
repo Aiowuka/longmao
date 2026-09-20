@@ -27,7 +27,13 @@ say '启动 Totoro Worker'
 start_managed totoro-worker "$LONGMAO_TOTORO" "NODE_ENV=production npx --yes pnpm@10 worker:run"
 
 say '启动 WMPFDebugger'
-start_managed wmpf-debugger "$LONGMAO_WMPF" "npx ts-node src/index.ts --auto-detect"
+if [[ -r /proc/sys/kernel/yama/ptrace_scope ]]; then
+  ptrace_scope="$(cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || true)"
+  if [[ "$ptrace_scope" != "0" ]]; then
+    warn "Linux ptrace_scope=$ptrace_scope；Frida 可能无法附加 WeChatAppEx。可临时执行: sudo sysctl -w kernel.yama.ptrace_scope=0"
+  fi
+fi
+start_managed wmpf-debugger "$LONGMAO_WMPF" "npx ts-node src/index.ts"
 if ! wait_port 62000 12; then
   warn 'WMPF CDP 62000 暂未就绪。请确认 Linux 微信/WMPF 版本受上游支持，并打开一个小程序。'
 fi
