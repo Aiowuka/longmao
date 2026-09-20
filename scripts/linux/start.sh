@@ -33,7 +33,7 @@ if [[ -r /proc/sys/kernel/yama/ptrace_scope ]]; then
     warn "Linux ptrace_scope=$ptrace_scope；Frida 可能无法附加 WeChatAppEx。可临时执行: sudo sysctl -w kernel.yama.ptrace_scope=0"
   fi
 fi
-start_managed wmpf-debugger "$LONGMAO_INSTALL_ROOT_RESOLVED" "'$SCRIPT_DIR/wmpf-supervisor.sh'"
+start_managed wmpf-debugger "$LONGMAO_INSTALL_ROOT_RESOLVED" "bash '$SCRIPT_DIR/wmpf-supervisor.sh'"
 if ! wait_port 62000 2; then
   warn 'WMPF supervisor 已启动；CDP 62000 会在检测到 WeChatAppEx 后自动就绪。'
 fi
@@ -46,7 +46,7 @@ printf '\nLongmao 已启动。\n'
 printf '1. 打开 Linux 微信。\n'
 printf '2. 打开连接到你自有后台的小程序。\n'
 printf '3. 浏览器进入 http://127.0.0.1:3210\n'
-printf '4. 点“连接 CDP”，正常登录/刷新后同步 Totoro。\n'
+printf '4. Longmao 会自动连接 CDP；正常登录/刷新后同步 Totoro。\n'
 
 if command_exists xdg-open; then
   xdg-open http://127.0.0.1:3210 >/dev/null 2>&1 || true
