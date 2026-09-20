@@ -22,16 +22,22 @@ async function loadSources() {
   return validateSourceManifest(manifest);
 }
 
-async function saveReport(report) {
-  const directory = join(root, 'artifacts');
+async function atomicWriteReport(path, report) {
+  const directory = dirname(path);
   await mkdir(directory, {recursive: true});
   const temporary = join(directory, `.report-${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, JSON.stringify(report, null, 2) + '\n', {encoding: 'utf8', flag: 'wx', mode: 0o600});
-    await rename(temporary, join(directory, 'last-report.json'));
+    await rename(temporary, path);
   } finally {
     await rm(temporary, {force: true});
   }
+}
+
+async function saveReport(report) {
+  const directory = join(root, 'artifacts');
+  await atomicWriteReport(join(directory, `report-${report.scenario}.json`), report);
+  await atomicWriteReport(join(directory, 'last-report.json'), report);
 }
 
 async function main() {
