@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO='Aiowuka/longmao'
-DEFAULT_REF='6d0d52ef2124c4142a9877bb6915b916e98a0bb9'
+DEFAULT_REF='b5e9bacc2d4a5e1c729d314ba2880c18caad2213'
 REF="${LONGMAO_REF:-$DEFAULT_REF}"
 ARCHIVE_URL="https://github.com/$REPO/archive/$REF.tar.gz"
 
