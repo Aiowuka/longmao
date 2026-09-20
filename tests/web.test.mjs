@@ -178,7 +178,7 @@ test('CDP observer reads the miniapp token from wx storage without exposing arbi
       let result = {};
       if (message.method === 'Runtime.evaluate') {
         assert.match(message.params.expression, /wx\.getStorageSync\("token"\)/);
-        result = {result: {type: 'string', value: 'fixture-storage-token'}};
+        result = {result: {type: 'object', value: {hasWx: true, token: 'fixture-storage-token', keys: ['token']}}};
       }
       queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
     }
@@ -305,7 +305,7 @@ test('CDP observer can inspect miniapp storage key names without returning value
     send(raw) {
       const message = JSON.parse(raw);
       const result = message.params?.expression?.includes('getStorageInfoSync')
-        ? {result: {type: 'object', value: ['sessionKey', 'profile']}}
+        ? {result: {type: 'object', value: {hasWx: true, token: '', keys: ['sessionKey', 'profile']}}}
         : {};
       queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
     }
@@ -349,4 +349,61 @@ test('CDP auto-connect loop retries until WMPF CDP becomes available', async () 
   stop();
   assert.equal(connected, true);
   assert.ok(attempts >= 3);
+});
+
+
+test('CDP observer selects the app-service execution context that exposes wx', async () => {
+  class FakeSocket {
+    constructor() {
+      this.readyState = 1;
+      this.listeners = new Map();
+    }
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+    send(raw) {
+      const message = JSON.parse(raw);
+      let result = {};
+      if (message.method === 'Runtime.evaluate') {
+        if (message.params.contextId === 2) {
+          result = {result: {type: 'object', value: {
+            hasWx: true,
+            token: 'context-aware-token',
+            keys: ['token', 'profile'],
+          }}};
+        } else {
+          result = {result: {type: 'object', value: {hasWx: false, token: '', keys: []}}};
+        }
+      }
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+  }
+
+  const socket = new FakeSocket();
+  const observer = new CdpObserver({wsFactory: () => socket, commandTimeoutMs: 50});
+  observer.socket = socket;
+  observer.state = 'connected';
+  observer.instrumented = true;
+  socket.addEventListener('message', event => observer.ingest(event.data));
+
+  observer.ingest({
+    method: 'Runtime.executionContextCreated',
+    params: {context: {id: 1, name: 'page-frame', origin: 'https://servicewechat.com'}},
+  });
+  observer.ingest({
+    method: 'Runtime.executionContextCreated',
+    params: {context: {id: 2, name: 'app-service', origin: ''}},
+  });
+
+  const captured = await observer.captureStoredToken();
+  assert.equal(captured, true);
+  assert.equal(observer.getToken(), 'context-aware-token');
+  assert.equal(observer.status().wxContextId, 2);
+  assert.deepEqual(observer.status().storageKeys, ['token', 'profile']);
+  assert.ok(observer.events().some(event => event.kind === 'wx_context_found' && event.contextId === 2));
 });
