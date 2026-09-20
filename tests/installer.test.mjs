@@ -209,3 +209,12 @@ test('WMPF JSContext routing overlay preserves and selects miniapp jscontext_id'
     assert.match(source, /node "\$jscontext_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
   }
 });
+
+
+test('supervisor self-heals the known legacy Linux scene pointer bug', async () => {
+  const source = await read('scripts/linux/wmpf-supervisor.sh');
+  assert.match(source, /repair_known_legacy_pointer_bug/);
+  assert.match(source, /remoteDebugParametersPtr\.add\(structOffsets\\\[5\\\]\)/);
+  assert.match(source, /remoteDebugConfigPtr\.add\(structOffsets\[5\]\)/);
+  assert.match(source, /sed -i/);
+});
