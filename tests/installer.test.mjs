@@ -193,3 +193,19 @@ test('Longmao carries an explicit WMPF Linux legacy scene pointer patch', async 
     assert.match(source, /git -C "\$LONGMAO_WMPF" apply --check/);
   }
 });
+
+
+test('WMPF JSContext routing overlay preserves and selects miniapp jscontext_id', async () => {
+  const patcher = await read('patches/wmpf-debugger/apply-jscontext-routing.mjs');
+  assert.match(patcher, /LONGMAO_WMPF_JSCONTEXT_ROUTING_V1/);
+  assert.match(patcher, /addJsContext/);
+  assert.match(patcher, /Longmao\.getJsContexts/);
+  assert.match(patcher, /Longmao\.connectJsContext/);
+  assert.match(patcher, /jscontext_id: activeJsContextId/);
+
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /apply-jscontext-routing\.mjs/);
+    assert.match(source, /node "\$jscontext_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
+  }
+});
