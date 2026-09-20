@@ -603,6 +603,31 @@ export class CdpObserver {
       return true;
     }
 
+    if (message.method === 'Longmao.networkDebug') {
+      const source = typeof params.source === 'string' ? params.source : 'network-debug';
+      const origin = typeof params.origin === 'string' ? params.origin : null;
+      const path = typeof params.path === 'string' && params.path.startsWith('/') ? params.path : null;
+      const method = typeof params.method === 'string' && /^[A-Z]{1,16}$/.test(params.method)
+        ? params.method
+        : null;
+      const status = Number.isInteger(params.status) && params.status >= 100 && params.status <= 599
+        ? params.status
+        : null;
+      const phase = typeof params.phase === 'string' && params.phase.length <= 64 ? params.phase : null;
+
+      this._record({
+        kind: 'network_debug_meta',
+        source,
+        origin,
+        path,
+        method,
+        status,
+        phase,
+        matchedCaptureOrigin: Boolean(this.captureConfig && origin === this.captureConfig.origin),
+      });
+      return true;
+    }
+
     if (message.method === 'Longmao.jsContextAdded') {
       const id = typeof params.id === 'string' ? params.id : '';
       if (id) {
