@@ -49,6 +49,7 @@
           <div><dt>Instrumentation</dt><dd id="cdp-instrumented">—</dd></div>
           <div><dt>Capture origin</dt><dd id="capture-origin">—</dd></div>
           <div><dt>Token</dt><dd id="cdp-token">未捕获</dd></div>
+          <div><dt>Storage keys</dt><dd id="storage-keys">—</dd></div>
           <div><dt>事件</dt><dd id="cdp-event-count">0</dd></div>
         </dl>
         <div class="actions">
@@ -147,7 +148,7 @@
           <button id="events-clear" class="secondary">清空</button>
         </div>
       </div>
-      <p class="hint">仅显示配置 capture origin 的请求路径/状态；Console 只记录级别和参数数量。</p>
+      <p class="hint">诊断模式显示 HTTP(S) 请求的 origin/path/method/status；不记录请求头、Cookie、请求体、响应体或 query 值。</p>
       <div id="events" class="event-list"><p class="muted">暂无事件。</p></div>
     </section>
 

@@ -60,8 +60,7 @@ function renderCdp(cdp) {
     ? `${cdp.auth.preview} · ${cdp.auth.length} chars · ${cdp.auth.source}`
     : (cdp.authRetrying ? `等待登录态 · 自动重试 ${cdp.authRetryCount || 0}/${cdp.authRetryLimit || 0}` : '未捕获');
   const keys = Array.isArray(cdp.storageKeys) ? cdp.storageKeys : [];
-  const eventRoot = $('#events');
-  if (keys.length && eventRoot) eventRoot.dataset.storageKeys = keys.join(', ');
+  $('#storage-keys').textContent = keys.length ? keys.join(', ') : '—';
 }
 
 function renderTotoro(status) {

@@ -319,3 +319,11 @@ test('CDP observer can inspect miniapp storage key names without returning value
   assert.deepEqual(keys, ['sessionKey', 'profile']);
   assert.deepEqual(observer.status().storageKeys, ['sessionKey', 'profile']);
 });
+
+
+test('web UI exposes safe CDP diagnostic fields', async () => {
+  const response = await fetch(base + '/');
+  const html = await response.text();
+  assert.match(html, /id="storage-keys"/);
+  assert.match(html, /不记录请求头、Cookie、请求体、响应体或 query 值/);
+});
