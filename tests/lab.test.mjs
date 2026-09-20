@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile, readdir} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
@@ -120,11 +120,19 @@ test('demo does not use fetch', () => {
   globalThis.fetch = () => { throw new Error('NETWORK_CALL_FORBIDDEN'); };
   try { assert.equal(runDemo().ok, true); } finally { globalThis.fetch = original; }
 });
-test('runtime source has no network, subprocess or dynamic upstream imports', async () => {
-  for (const name of await readdir(join(root, 'src'))) {
+test('offline core source has no network, subprocess or dynamic upstream imports', async () => {
+  for (const name of ['lab.mjs', 'cli.mjs', 'provenance.mjs']) {
     const source = await readFile(join(root, 'src', name), 'utf8');
     assert.doesNotMatch(source, /node:(?:http|https|net|tls|dgram|child_process)|\bfetch\s*\(|\bWebSocket\s*\(|\bimport\s*\(/);
   }
+});
+test('web integration remains loopback-only and cannot launch upstream processes', async () => {
+  const web = await readFile(join(root, 'src', 'web.mjs'), 'utf8');
+  const bridge = await readFile(join(root, 'src', 'wmpf-bridge.mjs'), 'utf8');
+  assert.match(web, /127\.0\.0\.1/);
+  assert.match(bridge, /127\.0\.0\.1/);
+  assert.doesNotMatch(web + bridge, /node:child_process|\bspawn\s*\(|\bexec\s*\(/);
+  assert.doesNotMatch(bridge, /Authorization|Cookie|token/i);
 });
 test('reference commits are pinned and not runtime dependencies', async () => {
   const lock = JSON.parse(await readFile(join(root, 'upstreams.lock.json'), 'utf8'));

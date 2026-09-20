@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Longmao Local Lab</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">LOCAL AUTOMATION LAB</p>
+        <h1>Longmao 控制台</h1>
+        <p class="lead">把离线 Totoro 风格流程与 WMPFDebugger 的本机运行状态放到一个页面里。所有 Web API 只绑定 127.0.0.1。</p>
+      </div>
+      <div class="hero-status">
+        <span id="overall-badge" class="badge neutral">检查中</span>
+        <button id="refresh" class="ghost">刷新状态</button>
+      </div>
+    </header>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <p class="kicker">WMPF SIDECAR</p>
+            <h2>本机调试桥</h2>
+          </div>
+          <span id="wmpf-badge" class="badge neutral">检查中</span>
+        </div>
+        <div class="ports">
+          <div><span>Debug bridge</span><strong id="debug-port">9421</strong><small id="debug-state">—</small></div>
+          <div><span>CDP proxy</span><strong id="cdp-port">62000</strong><small id="cdp-state">—</small></div>
+        </div>
+        <p id="wmpf-hint" class="hint">只检测本机端口是否监听，不读取网络包、Cookie、Token 或业务请求。</p>
+        <code class="command">npx ts-node src/index.ts</code>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <p class="kicker">TOToro-STYLE LAB</p>
+            <h2>离线流程实验</h2>
+          </div>
+          <span class="badge safe">Mock only</span>
+        </div>
+        <p class="hint">运行六阶段内存模拟：模拟登录 → 固定任务 → 创建任务 → 固定样本 → Mock 提交 → 回执验证。</p>
+        <div class="actions">
+          <button data-scenario="success">运行成功流程</button>
+          <button data-scenario="expired-session" class="secondary">测试会话过期</button>
+          <button data-scenario="rejected-submission" class="secondary">测试拒绝提交</button>
+        </div>
+      </article>
+
+      <article class="card boundary">
+        <div class="card-head">
+          <div>
+            <p class="kicker">SAFETY BOUNDARY</p>
+            <h2>当前接线边界</h2>
+          </div>
+          <span class="badge safe">Local only</span>
+        </div>
+        <ul>
+          <li>Web 服务固定绑定 <code>127.0.0.1</code>。</li>
+          <li>WMPF 仅做 9421 / 62000 端口健康探测。</li>
+          <li>没有凭据输入框、Token 提取、请求重放或外部成绩提交。</li>
+          <li>实验输出只写入本地 <code>artifacts/last-report.json</code>。</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">LATEST RUN</p>
+          <h2>最近一次实验</h2>
+        </div>
+        <span id="run-badge" class="badge neutral">暂无</span>
+      </div>
+      <pre id="report">尚未运行。</pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">UPSTREAMS</p>
+          <h2>来源与状态</h2>
+        </div>
+      </div>
+      <div id="sources" class="sources"></div>
+    </section>
+
+    <footer>
+      <span>Longmao Local Lab</span>
+      <span id="runtime">—</span>
+    </footer>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,10 +1,10 @@
 {
   "name": "longmao-local-lab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
-  "description": "Offline workflow reproduction lab; no WeChat instrumentation or production requests.",
+  "description": "Local web lab with an offline workflow mock and loopback-only WMPFDebugger readiness bridge.",
   "engines": {
     "node": ">=22"
   },
@@ -12,7 +12,8 @@
     "doctor": "node src/cli.mjs doctor",
     "sources": "node src/cli.mjs sources",
     "demo": "node src/cli.mjs demo",
-    "test": "node --test tests/lab.test.mjs tests/provenance.test.mjs",
-    "reproduce": "node src/cli.mjs doctor && node --test tests/lab.test.mjs tests/provenance.test.mjs && node src/cli.mjs demo"
+    "web": "node src/web.mjs",
+    "test": "node --test tests/lab.test.mjs tests/provenance.test.mjs tests/web.test.mjs",
+    "reproduce": "node src/cli.mjs doctor && node --test tests/lab.test.mjs tests/provenance.test.mjs tests/web.test.mjs && node src/cli.mjs demo"
   }
 }
