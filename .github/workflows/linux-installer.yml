@@ -49,7 +49,7 @@ jobs:
       - name: Smoke-test managed process PATH inheritance
         run: |
           test_root="$(mktemp -d)"
-          mkdir -p "$test_root/install/scripts/linux" "$test_root/runtime/node/bin" "$test_root/runtime/logs" "$test_root/runtime/pids" "$test_root/config" "$test_root/bin" "$test_root/work"
+          mkdir -p "$test_root/install/scripts/linux" "$test_root/runtime/node/bin" "$test_root/runtime/logs" "$test_root/runtime/pids" "$test_root/runtime/work" "$test_root/config" "$test_root/bin"
           cp scripts/linux/common.sh "$test_root/install/scripts/linux/common.sh"
           cat >"$test_root/runtime/node/bin/longmao-private-tool" <<'EOF'
           #!/usr/bin/env bash
