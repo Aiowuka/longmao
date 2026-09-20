@@ -81,6 +81,9 @@ export class CdpObserver {
     this.socket = null;
     this.state = 'disconnected';
     this.instrumented = false;
+    this.executionContexts.clear();
+    this.wxContextId = null;
+    this.storageKeys = [];
     if (this.targetRetryTimer) clearTimeout(this.targetRetryTimer);
     if (this.authRetryTimer) clearTimeout(this.authRetryTimer);
     this.targetRetryTimer = null;
@@ -96,6 +99,8 @@ export class CdpObserver {
     this.currentPage = null;
     this.storageCaptureInFlight = false;
     this.storageKeys = [];
+    this.executionContexts = new Map();
+    this.wxContextId = null;
   }
 
   status() {
@@ -119,6 +124,8 @@ export class CdpObserver {
       authRetryCount: this.authRetryCount,
       authRetryLimit: this.authRetryLimit,
       storageKeys: [...this.storageKeys],
+      runtimeContextCount: this.executionContexts.size,
+      wxContextId: this.wxContextId,
     };
   }
 
@@ -321,18 +328,73 @@ export class CdpObserver {
     }, this.authRetryIntervalMs);
   }
 
-  async inspectStorageKeys() {
-    if (!this.socket || this.socket.readyState !== 1 || !this.instrumented) return [];
-    const result = await this.command('Runtime.evaluate', {
-      expression: '(() => { try { const info = (typeof wx !== "undefined" && wx.getStorageInfoSync) ? wx.getStorageInfoSync() : null; return info && Array.isArray(info.keys) ? info.keys.map(String).slice(0, 100) : []; } catch { return []; } })()',
+  _contextIds() {
+    const ids = [...this.executionContexts.keys()];
+    if (Number.isInteger(this.wxContextId)) {
+      return [this.wxContextId, ...ids.filter(id => id !== this.wxContextId)];
+    }
+    return ids;
+  }
+
+  async _readWxState(contextId = null) {
+    const params = {
+      expression: '(() => { try { const hasWx = typeof wx !== "undefined" && typeof wx.getStorageSync === "function"; if (!hasWx) return {hasWx:false, token:"", keys:[]}; const token = String(wx.getStorageSync("token") || ""); const info = typeof wx.getStorageInfoSync === "function" ? wx.getStorageInfoSync() : null; const keys = info && Array.isArray(info.keys) ? info.keys.map(String).slice(0, 100) : []; return {hasWx:true, token, keys}; } catch { return {hasWx:false, token:"", keys:[]}; } })()',
       returnByValue: true,
       awaitPromise: false,
-    });
-    const keys = result?.result?.value;
-    this.storageKeys = Array.isArray(keys)
-      ? keys.filter(key => typeof key === 'string').slice(0, 100)
-      : [];
-    return [...this.storageKeys];
+    };
+    if (Number.isInteger(contextId)) params.contextId = contextId;
+    const result = await this.command('Runtime.evaluate', params);
+    const value = result?.result?.value;
+    if (!value || typeof value !== 'object' || value.hasWx !== true) return null;
+    return {
+      contextId: Number.isInteger(contextId) ? contextId : null,
+      token: typeof value.token === 'string' ? value.token : '',
+      keys: Array.isArray(value.keys)
+        ? value.keys.filter(key => typeof key === 'string').slice(0, 100)
+        : [],
+    };
+  }
+
+  async _findWxState() {
+    const candidates = this._contextIds();
+    if (candidates.length === 0) candidates.push(null);
+
+    for (const contextId of candidates) {
+      let state;
+      try {
+        state = await this._readWxState(contextId);
+      } catch (error) {
+        this._record({
+          kind: 'runtime_context_probe_failed',
+          contextId: Number.isInteger(contextId) ? contextId : null,
+          code: error?.code || 'CDP_CONTEXT_PROBE_FAILED',
+        });
+        continue;
+      }
+      if (!state) continue;
+
+      const changed = this.wxContextId !== state.contextId;
+      this.wxContextId = state.contextId;
+      this.storageKeys = [...state.keys];
+      if (changed || !this.timeline.some(event => event.kind === 'wx_context_found')) {
+        const meta = Number.isInteger(state.contextId) ? this.executionContexts.get(state.contextId) : null;
+        this._record({
+          kind: 'wx_context_found',
+          contextId: state.contextId,
+          name: meta?.name || null,
+          origin: meta?.origin || null,
+          storageKeyCount: state.keys.length,
+        });
+      }
+      return state;
+    }
+    return null;
+  }
+
+  async inspectStorageKeys() {
+    if (!this.socket || this.socket.readyState !== 1 || !this.instrumented) return [];
+    const state = await this._findWxState();
+    return state ? [...state.keys] : [];
   }
 
   async captureStoredToken() {
@@ -341,15 +403,10 @@ export class CdpObserver {
     }
     this.storageCaptureInFlight = true;
     try {
-      const result = await this.command('Runtime.evaluate', {
-        expression: '(() => { try { return (typeof wx !== "undefined" && wx.getStorageSync) ? String(wx.getStorageSync("token") || "") : ""; } catch { return ""; } })()',
-        returnByValue: true,
-        awaitPromise: false,
-      });
-      const value = result?.result?.value;
-      await this.inspectStorageKeys().catch(() => []);
-      if (typeof value === 'string' && value.trim()) {
-        return this._captureToken(value, 'wx-storage:token');
+      const state = await this._findWxState();
+      if (!state) return false;
+      if (state.token.trim()) {
+        return this._captureToken(state.token, 'wx-storage:token');
       }
       return false;
     } finally {
@@ -462,9 +519,43 @@ export class CdpObserver {
     }
 
     if (message.method === 'Runtime.executionContextCreated') {
+      const context = params.context;
+      if (context && Number.isInteger(context.id)) {
+        const meta = {
+          id: context.id,
+          name: typeof context.name === 'string' ? context.name : '',
+          origin: typeof context.origin === 'string' ? context.origin : '',
+        };
+        this.executionContexts.set(context.id, meta);
+        this._record({
+          kind: 'runtime_context',
+          contextId: meta.id,
+          name: meta.name || null,
+          origin: meta.origin || null,
+        });
+      }
       if (this.instrumented && !this.token) {
         queueMicrotask(() => this.captureStoredToken().catch(() => {}));
       }
+      return true;
+    }
+
+    if (message.method === 'Runtime.executionContextDestroyed') {
+      const contextId = params.executionContextId;
+      if (Number.isInteger(contextId)) {
+        this.executionContexts.delete(contextId);
+        if (this.wxContextId === contextId) {
+          this.wxContextId = null;
+          this.storageKeys = [];
+        }
+      }
+      return true;
+    }
+
+    if (message.method === 'Runtime.executionContextsCleared') {
+      this.executionContexts.clear();
+      this.wxContextId = null;
+      this.storageKeys = [];
       return true;
     }
 
