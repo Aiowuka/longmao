@@ -26,6 +26,27 @@ child_pid=''
 stopping=0
 last_wait_notice=0
 
+detect_client_version() {
+  local cmdline value
+  for cmdline in /proc/[0-9]*/cmdline; do
+    [[ -r "$cmdline" ]] || continue
+    value="$(tr '\0' ' ' <"$cmdline" 2>/dev/null || true)"
+    [[ "$value" == *WeChatAppEx* ]] || continue
+    if [[ "$value" =~ --client_version=([0-9]+) ]]; then
+      printf '%s\n' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+modern_version_supported() {
+  case "$1" in
+    4067695881) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 wechat_process_present() {
   local comm name
   for comm in /proc/[0-9]*/comm; do
@@ -68,6 +89,16 @@ while (( ! stopping )); do
     fi
     sleep "$retry_seconds"
     continue
+  fi
+
+  client_version="$(detect_client_version || true)"
+  if [[ -n "$client_version" ]] && ! modern_version_supported "$client_version"; then
+    printf '[wmpf-supervisor] 当前 Linux WMPF client_version=%s 尚未适配；为避免半工作状态，拒绝启动调试器。\n' "$client_version" >&2
+    sleep 15
+    continue
+  fi
+  if [[ -n "$client_version" ]]; then
+    printf '[wmpf-supervisor] 检测到受支持 Linux WMPF client_version=%s。\n' "$client_version"
   fi
 
   printf '[wmpf-supervisor] 检测到 WeChatAppEx，启动 WMPFDebugger。\n'
