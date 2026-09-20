@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 function Get-LongmaoRuntimeRoot {
   if ($env:LONGMAO_RUNTIME_ROOT) { return $env:LONGMAO_RUNTIME_ROOT }
