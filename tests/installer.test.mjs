@@ -317,7 +317,8 @@ test('WMPF overlay patchers emit real source newlines when applied', async () =>
     const patched = await readFile(target, 'utf8');
     assert.match(patched, /LONGMAO_WMPF_NETWORK_ONLY_MODE_V1/);
     assert.match(patched, /LONGMAO_WMPF_NETWORK_METADATA_ADAPTER_V1/);
-    assert.match(patched, /let networkOnlySeen = false;\n\s+const emitNetworkOnlyAvailable/);
+    assert.match(patched, /let networkOnlySeen = false;\n/);
+    assert.match(patched, /const emitNetworkOnlyAvailable = \(sourceKind: string\) => \{/);
     assert.match(patched, /const parseNetworkObject = .*\n\s+const findNetworkScalar/s);
     assert.doesNotMatch(patched, /\\\\n/);
   } finally {
