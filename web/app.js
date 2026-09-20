@@ -236,6 +236,12 @@ function renderEvents(events) {
     else if (event.kind === 'runtime_context') detail.textContent = `context ${event.contextId} · ${event.name || 'unnamed'} · ${event.origin || 'no-origin'}`;
     else if (event.kind === 'wx_context_found') detail.textContent = `context ${event.contextId ?? 'default'} · wx ready · storage keys ${event.storageKeyCount || 0}`;
     else if (event.kind === 'runtime_context_probe_failed') detail.textContent = `context ${event.contextId ?? 'default'} · ${event.code || 'probe failed'}`;
+    else if (event.kind === 'wmpf_jscontexts') detail.textContent = `${event.count || 0} miniapp JS contexts`;
+    else if (event.kind === 'wmpf_jscontext_added') detail.textContent = `${event.id} · ${event.name || 'unnamed'}`;
+    else if (event.kind === 'wmpf_jscontext_removed') detail.textContent = event.id || '';
+    else if (event.kind === 'wmpf_jscontext_connected') detail.textContent = event.id || '';
+    else if (event.kind === 'wmpf_jscontext_selected') detail.textContent = `${event.id} · ${event.name || 'unnamed'}`;
+    else if (event.kind === 'wmpf_jscontext_probe_failed') detail.textContent = `${event.id} · ${event.code || 'probe failed'}`;
     else if (event.kind === 'auth_storage_capture_failed') detail.textContent = event.code || 'storage read failed';
     else if (event.kind === 'auth_storage_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
     else detail.textContent = event.code || '';
