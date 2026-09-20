@@ -83,11 +83,13 @@ apply_wmpf_patches() {
   local diagnostics_patcher="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/apply-miniapp-diagnostics.mjs"
   local result_context_patcher="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/apply-result-jscontext-inference.mjs"
   local network_only_patcher="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/apply-network-only-mode.mjs"
+  local network_metadata_patcher="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/apply-network-metadata-adapter.mjs"
   [[ -f "$patch_file" ]] || die "WMPFDebugger 补丁缺失: $patch_file"
   [[ -f "$jscontext_patcher" ]] || die "WMPFDebugger JSContext 补丁器缺失: $jscontext_patcher"
   [[ -f "$diagnostics_patcher" ]] || die "WMPFDebugger 诊断补丁器缺失: $diagnostics_patcher"
   [[ -f "$result_context_patcher" ]] || die "WMPFDebugger Result JSContext 补丁器缺失: $result_context_patcher"
   [[ -f "$network_only_patcher" ]] || die "WMPFDebugger Network-only 补丁器缺失: $network_only_patcher"
+  [[ -f "$network_metadata_patcher" ]] || die "WMPFDebugger 网络元数据补丁器缺失: $network_metadata_patcher"
   if grep -q 'remoteDebugParametersPtr.add(structOffsets\[5\])' "$LONGMAO_WMPF/frida/hook.js"; then
     git -C "$LONGMAO_WMPF" apply --check "$patch_file"
     git -C "$LONGMAO_WMPF" apply "$patch_file"
@@ -100,6 +102,7 @@ apply_wmpf_patches() {
   node "$diagnostics_patcher" "$LONGMAO_WMPF/src/index.ts"
   node "$result_context_patcher" "$LONGMAO_WMPF/src/index.ts"
   node "$network_only_patcher" "$LONGMAO_WMPF/src/index.ts"
+  node "$network_metadata_patcher" "$LONGMAO_WMPF/src/index.ts"
 }
 
 copy_longmao() {
