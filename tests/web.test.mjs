@@ -257,3 +257,65 @@ test('CDP observer polls wx storage until login completes', async () => {
   assert.ok(observer.events().some(event => event.kind === 'auth_storage_retry'));
   observer.disconnect();
 });
+
+
+test('CDP observer records unmatched network metadata without credential material', async () => {
+  const observer = new CdpObserver({
+    captureConfig: {
+      origin: 'https://capture.example',
+      pathPrefixes: ['/api/'],
+      requestHeaderNames: ['authorization'],
+      responseJsonPaths: ['token'],
+    },
+  });
+  observer.ingest({
+    method: 'Network.requestWillBeSent',
+    params: {
+      requestId: 'r1',
+      request: {
+        url: 'https://other.example/login?secret=query-value',
+        method: 'POST',
+        headers: {authorization: 'Bearer should-not-appear'},
+      },
+    },
+  });
+  const events = observer.events();
+  const seen = events.find(event => event.kind === 'network_seen');
+  assert.equal(seen.origin, 'https://other.example');
+  assert.equal(seen.path, '/login');
+  assert.equal(seen.method, 'POST');
+  assert.equal(seen.matchedCaptureOrigin, false);
+  assert.doesNotMatch(JSON.stringify(seen), /should-not-appear|query-value/);
+});
+
+test('CDP observer can inspect miniapp storage key names without returning values', async () => {
+  class FakeSocket {
+    constructor() {
+      this.readyState = 1;
+      this.listeners = new Map();
+    }
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+    send(raw) {
+      const message = JSON.parse(raw);
+      const result = message.params?.expression?.includes('getStorageInfoSync')
+        ? {result: {type: 'object', value: ['sessionKey', 'profile']}}
+        : {};
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+  }
+  const socket = new FakeSocket();
+  const observer = new CdpObserver({wsFactory: () => socket, commandTimeoutMs: 50});
+  observer.socket = socket;
+  observer.state = 'connected';
+  observer.instrumented = true;
+  const keys = await observer.inspectStorageKeys();
+  assert.deepEqual(keys, ['sessionKey', 'profile']);
+  assert.deepEqual(observer.status().storageKeys, ['sessionKey', 'profile']);
+});

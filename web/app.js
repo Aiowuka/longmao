@@ -59,6 +59,9 @@ function renderCdp(cdp) {
   $('#cdp-token').textContent = cdp.auth?.present
     ? `${cdp.auth.preview} · ${cdp.auth.length} chars · ${cdp.auth.source}`
     : (cdp.authRetrying ? `等待登录态 · 自动重试 ${cdp.authRetryCount || 0}/${cdp.authRetryLimit || 0}` : '未捕获');
+  const keys = Array.isArray(cdp.storageKeys) ? cdp.storageKeys : [];
+  const eventRoot = $('#events');
+  if (keys.length && eventRoot) eventRoot.dataset.storageKeys = keys.join(', ');
 }
 
 function renderTotoro(status) {
@@ -224,6 +227,11 @@ function renderEvents(events) {
     else if (event.kind === 'auth_captured') detail.textContent = `${event.source} · ${event.tokenLength} chars`;
     else if (event.kind === 'console') detail.textContent = `${event.level} · args ${event.argumentCount}`;
     else if (event.kind === 'navigation') detail.textContent = event.url || '';
+    else if (event.kind === 'network_seen') {
+      const verb = event.direction === 'request' ? (event.method || 'REQ') : (event.status || 'RESP');
+      const mark = event.matchedCaptureOrigin ? ' · capture origin' : '';
+      detail.textContent = `${verb} ${event.origin || ''}${event.path || ''}${mark}`;
+    }
     else if (event.kind === 'cdp_instrument_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
     else if (event.kind === 'cdp_instrumented') detail.textContent = 'Network / Runtime / Page ready';
     else if (event.kind === 'auth_storage_capture_failed') detail.textContent = event.code || 'storage read failed';

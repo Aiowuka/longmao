@@ -95,6 +95,7 @@ export class CdpObserver {
     this.token = null;
     this.currentPage = null;
     this.storageCaptureInFlight = false;
+    this.storageKeys = [];
   }
 
   status() {
@@ -117,6 +118,7 @@ export class CdpObserver {
       authRetrying: Boolean(this.authRetryTimer),
       authRetryCount: this.authRetryCount,
       authRetryLimit: this.authRetryLimit,
+      storageKeys: [...this.storageKeys],
     };
   }
 
@@ -319,6 +321,20 @@ export class CdpObserver {
     }, this.authRetryIntervalMs);
   }
 
+  async inspectStorageKeys() {
+    if (!this.socket || this.socket.readyState !== 1 || !this.instrumented) return [];
+    const result = await this.command('Runtime.evaluate', {
+      expression: '(() => { try { const info = (typeof wx !== "undefined" && wx.getStorageInfoSync) ? wx.getStorageInfoSync() : null; return info && Array.isArray(info.keys) ? info.keys.map(String).slice(0, 100) : []; } catch { return []; } })()',
+      returnByValue: true,
+      awaitPromise: false,
+    });
+    const keys = result?.result?.value;
+    this.storageKeys = Array.isArray(keys)
+      ? keys.filter(key => typeof key === 'string').slice(0, 100)
+      : [];
+    return [...this.storageKeys];
+  }
+
   async captureStoredToken() {
     if (this.storageCaptureInFlight || !this.socket || this.socket.readyState !== 1 || !this.instrumented) {
       return false;
@@ -331,6 +347,7 @@ export class CdpObserver {
         awaitPromise: false,
       });
       const value = result?.result?.value;
+      await this.inspectStorageKeys().catch(() => []);
       if (typeof value === 'string' && value.trim()) {
         return this._captureToken(value, 'wx-storage:token');
       }
@@ -377,6 +394,19 @@ export class CdpObserver {
     const params = message.params || {};
     if (message.method === 'Network.requestWillBeSent') {
       const request = params.request || {};
+      let observedUrl = null;
+      try { observedUrl = new URL(request.url); } catch {}
+      if (observedUrl && (observedUrl.protocol === 'https:' || observedUrl.protocol === 'http:')) {
+        const matched = Boolean(this.captureConfig && observedUrl.origin === this.captureConfig.origin);
+        this._record({
+          kind: 'network_seen',
+          direction: 'request',
+          origin: observedUrl.origin,
+          path: observedUrl.pathname,
+          method: request.method || null,
+          matchedCaptureOrigin: matched,
+        });
+      }
       const url = this._allowedUrl(request.url);
       if (!url) return true;
       this._record({
@@ -394,6 +424,19 @@ export class CdpObserver {
 
     if (message.method === 'Network.responseReceived') {
       const response = params.response || {};
+      let observedUrl = null;
+      try { observedUrl = new URL(response.url); } catch {}
+      if (observedUrl && (observedUrl.protocol === 'https:' || observedUrl.protocol === 'http:')) {
+        const matched = Boolean(this.captureConfig && observedUrl.origin === this.captureConfig.origin);
+        this._record({
+          kind: 'network_seen',
+          direction: 'response',
+          origin: observedUrl.origin,
+          path: observedUrl.pathname,
+          status: response.status || null,
+          matchedCaptureOrigin: matched,
+        });
+      }
       const url = this._allowedUrl(response.url);
       if (!url) return true;
       this._record({
