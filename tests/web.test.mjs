@@ -411,3 +411,59 @@ test('CDP observer selects the app-service execution context that exposes wx', a
   assert.deepEqual(observer.status().storageKeys, ['token', 'profile']);
   assert.ok(observer.events().some(event => event.kind === 'wx_context_found' && event.contextId === 2));
 });
+
+
+test('CDP observer routes Runtime.evaluate through the WMPF jscontext that exposes wx', async () => {
+  let activeJsContext = '';
+  class FakeSocket {
+    constructor() {
+      this.readyState = 1;
+      this.listeners = new Map();
+    }
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+    send(raw) {
+      const message = JSON.parse(raw);
+      let result = {};
+      if (message.method === 'Longmao.getJsContexts') {
+        result = {
+          contexts: [
+            {id: 'page-js', name: 'webview'},
+            {id: 'app-js', name: 'app-service'},
+          ],
+          activeId: activeJsContext || 'page-js',
+        };
+      } else if (message.method === 'Longmao.connectJsContext') {
+        activeJsContext = message.params.id;
+        result = {activeId: activeJsContext};
+      } else if (message.method === 'Runtime.evaluate') {
+        result = {result: {type: 'object', value: activeJsContext === 'app-js'
+          ? {hasWx: true, token: 'wmpf-context-token', keys: ['token', 'profile']}
+          : {hasWx: false, token: '', keys: []}}};
+      }
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+  }
+
+  const socket = new FakeSocket();
+  const observer = new CdpObserver({wsFactory: () => socket, commandTimeoutMs: 50});
+  observer.socket = socket;
+  observer.state = 'connected';
+  observer.instrumented = true;
+  socket.addEventListener('message', event => observer.ingest(event.data));
+
+  const captured = await observer.captureStoredToken();
+  assert.equal(captured, true);
+  assert.equal(observer.getToken(), 'wmpf-context-token');
+  assert.equal(observer.status().wmpfRoutingAvailable, true);
+  assert.equal(observer.status().wmpfJsContextId, 'app-js');
+  assert.deepEqual(observer.status().storageKeys, ['token', 'profile']);
+  assert.ok(observer.events().some(event => event.kind === 'wmpf_jscontext_selected' && event.id === 'app-js'));
+  assert.ok(observer.events().some(event => event.kind === 'wx_context_found' && event.jscontextId === 'app-js'));
+});
