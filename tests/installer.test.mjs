@@ -159,9 +159,17 @@ test('Linux managed commands support leading environment assignments', async () 
 
 test('Linux WMPF launch uses upstream Linux version configs instead of Windows auto-detect', async () => {
   const source = await read('scripts/linux/start.sh');
-  assert.match(source, /npx ts-node src\/index\.ts/);
+  assert.match(source, /wmpf-supervisor\.sh/);
   assert.doesNotMatch(source, /src\/index\.ts --auto-detect/);
   assert.match(source, /ptrace_scope/);
+});
+
+test('Linux WMPF supervisor waits for WeChatAppEx and restarts upstream debugger', async () => {
+  const source = await read('scripts/linux/wmpf-supervisor.sh');
+  assert.match(source, /WeChatAppEx/);
+  assert.match(source, /exec npx ts-node src\/index\.ts/);
+  assert.match(source, /trap shutdown INT TERM EXIT/);
+  assert.match(source, /WMPFDebugger 已退出/);
 });
 
 
