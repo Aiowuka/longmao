@@ -256,6 +256,14 @@ function renderEvents(events) {
     else if (event.kind === 'auth_storage_capture_failed') detail.textContent = event.code || 'storage read failed';
     else if (event.kind === 'auth_storage_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
     else if (event.kind === 'network_debug_available') detail.textContent = event.source || 'network-debug';
+    else if (event.kind === 'network_debug_meta') {
+      const verb = event.method || (event.status ? String(event.status) : 'NET');
+      const target = [event.origin || '', event.path || ''].join('');
+      const status = event.status ? ` · ${event.status}` : '';
+      const phase = event.phase ? ` · ${event.phase}` : '';
+      const mark = event.matchedCaptureOrigin ? ' · capture origin' : '';
+      detail.textContent = `${verb} ${target}${status}${phase}${mark}`.trim();
+    }
     else if (event.kind === 'cdp_capability_mode') detail.textContent = `${event.mode || 'UNKNOWN'}${event.source ? ` · ${event.source}` : ''}`;
     else detail.textContent = event.code || '';
     const time = document.createElement('time');
