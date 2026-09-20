@@ -1,6 +1,8 @@
 # longmao — WMPF + Totoro 本地编排器
 
-Longmao 不重复实现 Totoro 的跑步业务逻辑，而是把 **WMPFDebugger + Totoro + 本地 Web 控制台** 编排成一个可安装、可启动、可诊断的本地工具。
+> **当前状态：0.5 Beta / 功能冻结。** 安装、启动、诊断、sidecar 编排和离线测试已收口；真实微信运行时的 AppService 登录态读取在部分环境中仍不可用。`main` 不再把 Token 获取或完整真实链路视为已完成能力。详见 [`docs/STATUS.md`](docs/STATUS.md)。
+
+Longmao 不重复实现 Totoro 的业务逻辑，而是把 **WMPFDebugger + Totoro + 本地 Web 控制台** 编排成一个可安装、可启动、可诊断的本地工具。
 
 ```text
 微信小程序
@@ -8,7 +10,8 @@ Longmao 不重复实现 Totoro 的跑步业务逻辑，而是把 **WMPFDebugger 
 WMPFDebugger
    ↓  ws://127.0.0.1:62000
 Longmao CDP Observer
-   ↓  捕获 Token（仅内存）
+   ↓  能力探测 / 诊断
+   ↓  登录态读取（实验性，依赖 AppService Runtime）
 Totoro HTTP Sidecar
    ↓
 你的 Totoro-compatible 后台
@@ -119,21 +122,15 @@ Linux 用户手册见 [docs/LINUX_USER_GUIDE.md](docs/LINUX_USER_GUIDE.md)。
    ↓
 打开微信和目标小程序
    ↓
-Longmao 页面点“连接 CDP”
+Longmao 页面查看 CDP / WMPF 状态
    ↓
-正常登录/刷新小程序
+识别当前能力模式：FULL_RUNTIME / NETWORK_ONLY
    ↓
-看到脱敏 Token
+如果是 NETWORK_ONLY：仅做网络元数据诊断，不尝试读取登录态
    ↓
-点“用捕获 Token 同步 Totoro”
+如果环境确实提供 AppService Runtime：再进入实验性登录态读取路径
    ↓
-选择任务 / 路线
-   ↓
-生成 Totoro Preview
-   ↓
-确认后交给 Totoro 开始
-   ↓
-查看 Queue / Worker / 最终结果
+其余 Totoro 能力仅在授权测试环境中验证
 ```
 
 完整用户手册见 [docs/USER_GUIDE.md](docs/USER_GUIDE.md)。
@@ -207,13 +204,15 @@ evi0s/WMPFDebugger
 
 WMPFDebugger 仍作为独立 sidecar 运行。Longmao 只连接其 loopback CDP proxy，不复制 Frida/hook/protobuf 实现。
 
-## Token 边界
+## 登录态读取边界（实验性）
 
-- 只有配置的 `capture.origin` 完全匹配时才观察对应 Network 事件；
-- 只有配置 pathname prefix 才尝试提取 Token；
-- 原始 Token 只存在 Longmao Node 进程内存中；
-- Web 只显示脱敏预览；
-- 不写入 Git、配置文件或 artifacts。
+当前最大未解决问题是：部分 Linux 微信 / WMPF 组合只能提供 `NETWORK_ONLY` 能力，无法获得 AppService JSContext，因此不能稳定读取登录态。
+
+- `NETWORK_ONLY` 下停止 storage polling，不把失败伪装成可用；
+- 只有明确检测到 AppService Runtime 时才允许进入登录态读取路径；
+- 诊断事件只保留脱敏元数据，不记录 Header、Cookie、请求体、响应体或 query 值；
+- 任何真实系统操作都必须在明确授权的测试环境中进行。
+
 
 ## Windows Redis-compatible 服务
 
@@ -248,6 +247,8 @@ http://127.0.0.1:3210
 Totoro 与 WMPF 的手动安装见 [docs/SIDECAR_SETUP.md](docs/SIDECAR_SETUP.md)。
 
 ## 验证
+
+CI 通过只代表 Longmao 自身代码、安装器和离线/模拟测试通过，**不代表真实微信 AppService 登录态读取或外部系统端到端链路已验证成功**。
 
 ```sh
 npm run doctor
