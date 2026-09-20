@@ -7,6 +7,20 @@ source "$SCRIPT_DIR/common.sh"
 [[ -d "$LONGMAO_WMPF" ]] || die 'WMPFDebugger runtime 缺失，请运行 longmao repair。'
 command_exists npx || die 'npx 不可用，请运行 longmao repair。'
 
+repair_known_legacy_pointer_bug() {
+  local hook="$LONGMAO_WMPF/frida/hook.js"
+  [[ -f "$hook" ]] || die "WMPFDebugger hook 缺失: $hook"
+  if grep -q 'remoteDebugParametersPtr.add(structOffsets\[5\])' "$hook"; then
+    warn '检测到 WMPFDebugger legacy Linux scene pointer bug，自动应用兼容修复。'
+    sed -i 's/remoteDebugParametersPtr.add(structOffsets\[5\])/remoteDebugConfigPtr.add(structOffsets[5])/' "$hook"
+  fi
+  if ! grep -q 'remoteDebugConfigPtr.add(structOffsets\[5\])' "$hook"; then
+    die 'WMPFDebugger hook.js 与已知兼容版本不一致，请运行 longmao repair。'
+  fi
+}
+
+repair_known_legacy_pointer_bug
+
 retry_seconds="${LONGMAO_WMPF_RETRY_SECONDS:-2}"
 child_pid=''
 stopping=0
