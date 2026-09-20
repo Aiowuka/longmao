@@ -75,7 +75,7 @@ jobs:
       - name: Smoke-test managed env assignment commands
         run: |
           test_root="$(mktemp -d)"
-          mkdir -p "$test_root/install/scripts/linux" "$test_root/runtime/logs" "$test_root/runtime/pids" "$test_root/config" "$test_root/bin" "$test_root/work"
+          mkdir -p "$test_root/install/scripts/linux" "$test_root/runtime/logs" "$test_root/runtime/pids" "$test_root/runtime/work" "$test_root/config" "$test_root/bin"
           cp scripts/linux/common.sh "$test_root/install/scripts/linux/common.sh"
           HOME="$test_root/home" \
           LONGMAO_INSTALL_ROOT="$test_root/install" \
@@ -84,7 +84,7 @@ jobs:
           LONGMAO_BIN_ROOT="$test_root/bin" \
           bash -c '
             source "$LONGMAO_INSTALL_ROOT/scripts/linux/common.sh"
-            start_managed env-test "$LONGMAO_RUNTIME_ROOT/work" "PORT=3456 NODE_ENV=production bash -c '\''echo "$PORT:$NODE_ENV"'\''"
+            start_managed env-test "$LONGMAO_RUNTIME_ROOT/work" "PORT=3456 NODE_ENV=production bash -c '\''echo "\$PORT:\$NODE_ENV"'\''"
             for _ in {1..30}; do
               grep -q "3456:production" "$LONGMAO_LOGS/env-test.out.log" 2>/dev/null && exit 0
               sleep 0.1
