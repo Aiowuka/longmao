@@ -128,3 +128,14 @@ test('Linux installer makes longmao the primary command and keeps legacy wrapper
   assert.match(source, /longmao start/);
   assert.match(source, /longmao uninstall/);
 });
+
+
+test('public curl bootstrap pins a tested public source snapshot', async () => {
+  const source = await read('install.sh');
+  assert.match(source, /REPO='Aiowuka\/longmao'/);
+  assert.match(source, /DEFAULT_REF='6d0d52ef2124c4142a9877bb6915b916e98a0bb9'/);
+  assert.match(source, /https:\/\/github\.com\/\$REPO\/archive\/\$REF\.tar\.gz/);
+  assert.match(source, /--proto '=https'/);
+  assert.match(source, /scripts\/linux\/install\.sh/);
+  assert.doesNotMatch(source, /token|Authorization:|GITHUB_TOKEN/i);
+});

@@ -42,7 +42,19 @@ Install Longmao.cmd
 ```
 
 
-## Linux 普通用户：直接运行 .run
+## Linux 普通用户：curl 一键安装
+
+推荐：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Aiowuka/longmao/main/install.sh | bash
+```
+
+这个公开 bootstrap 不要求 GitHub Token。它会通过 HTTPS 下载经过 CI 验证的固定 Longmao 源码快照，然后进入 Linux 安装器。
+
+高级用法可以用 `LONGMAO_REF=<commit>` 覆盖固定快照，用于开发/回滚；普通用户不需要设置。
+
+## Linux 离线/手动安装：直接运行 .run
 
 使用 Actions / Release 生成的：
 
