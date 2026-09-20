@@ -59,6 +59,12 @@ export function validateTotoroConfig(raw) {
     fail('INVALID_CAPTURE_JSON_PATHS');
   }
 
+  if (Object.prototype.hasOwnProperty.call(raw.capture, 'allowTokenReveal') &&
+      typeof raw.capture.allowTokenReveal !== 'boolean') {
+    fail('INVALID_TOKEN_REVEAL_SETTING');
+  }
+  const allowTokenReveal = raw.capture.allowTokenReveal === true;
+
   return Object.freeze({
     schemaVersion: 1,
     baseUrl,
@@ -67,6 +73,7 @@ export function validateTotoroConfig(raw) {
       pathPrefixes,
       requestHeaderNames: Object.freeze([...requestHeaderNames]),
       responseJsonPaths,
+      allowTokenReveal,
     }),
   });
 }
@@ -105,5 +112,6 @@ export function publicTotoroConfig(state) {
     capturePathPrefixes: state.config.capture.pathPrefixes,
     captureHeaderNames: state.config.capture.requestHeaderNames,
     capturesResponseJson: state.config.capture.responseJsonPaths.length > 0,
+    tokenRevealEnabled: state.config.capture.allowTokenReveal === true,
   };
 }
