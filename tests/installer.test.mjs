@@ -264,3 +264,19 @@ test('network-only capability overlay detects Linux WeChat network debug channel
     assert.match(source, /node "\$network_only_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
   }
 });
+
+
+test('sanitized network metadata adapter never forwards headers, bodies, cookies or query values', async () => {
+  const patcher = await read('patches/wmpf-debugger/apply-network-metadata-adapter.mjs');
+  assert.match(patcher, /LONGMAO_WMPF_NETWORK_METADATA_ADAPTER_V1/);
+  assert.match(patcher, /Longmao\.networkDebug/);
+  assert.match(patcher, /url\.origin/);
+  assert.match(patcher, /url\.pathname/);
+  assert.doesNotMatch(patcher, /authorization|cookie|set-cookie/i);
+
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /apply-network-metadata-adapter\.mjs/);
+    assert.match(source, /node "\$network_metadata_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
+  }
+});
