@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feat/linux-one-click-installer
+      - main
     paths:
       - 'install.sh'
       - 'scripts/linux/**'
@@ -96,7 +96,9 @@ jobs:
         run: |
           LONGMAO_BOOTSTRAP_TEST_ONLY=1 bash install.sh | tee /tmp/longmao-bootstrap.txt
           grep -q '^Longmao bootstrap OK$' /tmp/longmao-bootstrap.txt
-          grep -q 'ref=6d0d52ef2124c4142a9877bb6915b916e98a0bb9' /tmp/longmao-bootstrap.txt
+          expected_ref="$(awk -F"'" '/^DEFAULT_REF=/{print $2; exit}' install.sh)"
+          test -n "$expected_ref"
+          grep -q "ref=$expected_ref" /tmp/longmao-bootstrap.txt
 
       - name: Smoke-test unified Longmao CLI
         run: |
