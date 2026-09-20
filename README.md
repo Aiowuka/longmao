@@ -1,137 +1,176 @@
-# longmao — 本地 WMPF / CDP 自动化实验台
+# longmao — WMPF + Totoro 本地编排器
 
-Longmao 现在包含三层：
+Longmao 不再自己实现跑步业务逻辑。
 
-1. **WMPFDebugger sidecar**：负责把微信小程序运行时暴露成 CDP。
-2. **Longmao CDP Observer**：连接 `ws://127.0.0.1:62000`，观察自有后台请求并自动捕获登录态。
-3. **Self-hosted Backend Flow**：对你自己的后台执行固定的 `profile → tasks → start → submit → receipt` 流程，并本地生成带明确 synthetic 标识的测试跑步数据。
+当前职责非常明确：
 
-同时保留原来的离线 Mock 流程作为回归基线。
-
-## 启动
-
-需要 Node.js 22+。
-
-```sh
-npm run web
-```
-
-打开：
+- **WMPFDebugger**：负责微信小程序运行时调试与 CDP proxy。
+- **Totoro**：负责 Token 验证、任务获取、Preview、跑步计划/轨迹生成、开始流程、Redis 延迟队列与最终提交。
+- **Longmao**：负责本地 Web UI、CDP 登录态捕获，以及对两个 sidecar 的编排。
 
 ```text
-http://127.0.0.1:3210
+微信小程序
+   ↓
+WMPFDebugger
+   ↓  ws://127.0.0.1:62000
+Longmao CDP Observer
+   ↓  捕获 Token（仅内存）
+Totoro HTTP Sidecar
+   ↓
+你自己的 Totoro-compatible 后台
 ```
 
-Windows 可以双击 `start-web.bat`。
+## 1. 启动 Totoro
 
-## 配置你自己的后台
+建议使用 Longmao 当前核对过的 Totoro snapshot：
+
+```text
+yuyuyudlc/Totoro
+c499040d52c6e1d45f06f7949419799ccc770db9
+```
+
+Totoro 单独克隆、安装和运行；Longmao 不复制它的源码。
+
+在 Totoro 目录配置：
+
+```dotenv
+SUNRUN_MINIPROGRAM_BASE_URL=https://你的后台
+REDIS_URL=redis://127.0.0.1:6379
+```
+
+然后：
 
 ```sh
-cp config/backend.example.json config/backend.json
+pnpm install
+pnpm dev
 ```
 
-然后把 `origin` 和五个 endpoint 改成你的后台。详细 contract：
+如果使用 Totoro 的延迟跑步队列，还需要另一个终端：
 
-- [docs/SELF_HOSTED_BACKEND.md](docs/SELF_HOSTED_BACKEND.md)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+```sh
+pnpm worker:run
+```
 
-`config/backend.json` 已经加入 `.gitignore`。
+默认 Longmao 预期 Totoro 在：
 
-远程后台必须 HTTPS；只有 localhost / 127.0.0.1 / ::1 可以使用 HTTP。
+```text
+http://127.0.0.1:3000
+```
 
-## 启动 WMPFDebugger
+## 2. 启动 WMPFDebugger
 
-在 WMPFDebugger 自己的目录按上游方式运行：
+WMPFDebugger 也保持独立安装：
 
 ```sh
 npx ts-node src/index.ts
 ```
 
-默认：
+默认端口：
 
-- remote-debug bridge: `9421`
+- remote debug bridge: `9421`
 - CDP proxy: `62000`
 
-Longmao 页面先确认两个端口在线，然后点击 **连接 CDP**。
+## 3. 配置 Longmao
 
-## 自动登录态链路
+复制：
 
-连接后，Longmao 会启用：
-
-- `Network.enable`
-- `Runtime.enable`
-- `Page.enable`
-
-当你在小程序里正常登录/访问自己的后台时，Longmao 只检查与 `backend.json.origin` 完全一致的请求。
-
-Token 可以按配置从：
-
-- 请求 Header；
-- JSON 响应字段；
-
-中捕获。
-
-原始 Token：
-
-- 只在 Node 进程内存中存在；
-- 不写入 artifacts；
-- 不写入 config；
-- Web 页面只显示脱敏预览；
-- 没有返回明文 Token 的 API。
-
-## 自有后台完整流程
-
-捕获 Token 后，可在页面执行：
-
-```text
-profile（可选）
-  ↓
-tasks（可选）
-  ↓
-生成 synthetic run
-  ↓
-start
-  ↓
-submit
-  ↓
-receipt（可选）
+```sh
+cp config/totoro.example.json config/totoro.json
 ```
 
-运行表单填写：
+Windows PowerShell：
 
-- taskId
-- 距离
-- 时长
-- 中心经纬度
+```powershell
+Copy-Item config/totoro.example.json config/totoro.json
+```
 
-Longmao 独立生成圆形多圈测试轨迹。提交对象明确包含：
+修改：
 
 ```json
 {
-  "synthetic": true,
-  "generatedBy": "longmao-test-generator"
+  "baseUrl": "http://127.0.0.1:3000",
+  "capture": {
+    "origin": "https://你的后台",
+    "pathPrefixes": ["/wxxcx/"],
+    "requestHeaderNames": ["authorization"],
+    "responseJsonPaths": ["token", "data.token"]
+  }
 }
 ```
 
-因此你的后台可以明确区分 Longmao 生成的数据。
+`capture.origin` 应与 Totoro 的 `SUNRUN_MINIPROGRAM_BASE_URL` 指向同一业务后台。
 
-## CDP 时间线
+`config/totoro.json` 已加入 `.gitignore`。
 
-页面可以查看：
+## 4. 启动 Longmao
 
-- 自有后台 request path / method
-- response status / mimeType
-- 页面导航
-- console 事件级别和参数数量
-- 登录态捕获事件
+```sh
+npm run web
+```
 
-不会展示：
+浏览器打开：
 
-- 其他 origin 的 Network 请求
-- Console 参数值
-- 明文 Token
+```text
+http://127.0.0.1:3210
+```
 
-## 离线基线
+Windows 可双击 `start-web.bat`。
+
+## 5. 实际工作流
+
+在页面中：
+
+```text
+WMPF 9421 / 62000 在线
+        ↓
+连接 CDP
+        ↓
+在微信小程序正常登录/访问你的后台
+        ↓
+Longmao 捕获 Token（只在进程内存）
+        ↓
+“用捕获 Token 同步 Totoro”
+        ↓
+Totoro /api/login/token
+        ↓
+Totoro /api/sunrun/tasks
+        ↓
+选择 Totoro 返回的任务和路线
+        ↓
+Totoro /api/sunrun/preview
+        ↓
+Totoro /api/sunrun/start
+        ↓
+Totoro /api/sunrun/run-job
+```
+
+Longmao 不生成路线、不生成跑步轨迹、不构造 Totoro 的业务提交包。
+
+## 6. 当前复用的 Totoro API
+
+Longmao 只调用以下固定接口：
+
+- `POST /api/login/token`
+- `POST /api/sunrun/tasks`
+- `POST /api/sunrun/preview`
+- `POST /api/sunrun/start`
+- `POST /api/sunrun/run-job`
+
+不存在任意 URL / Header / Body 的通用请求重放接口。
+
+## 7. Token 边界
+
+CDP 登录态捕获仍然做 allowlist：
+
+- 只有 `capture.origin` 完全匹配时才记录 Network 摘要。
+- 只有配置的 pathname prefix 才尝试提取 Token。
+- 原始 Token 只在 Longmao Node 进程内存中。
+- 前端只显示脱敏预览。
+- 不写入 Git、配置文件或 artifacts。
+
+## 8. Longmao 自身 Mock
+
+原离线 Mock 继续保留，只作为 Longmao 自己的回归基线：
 
 ```sh
 npm run doctor
@@ -141,29 +180,18 @@ npm run reproduce
 npm run sources
 ```
 
-原有六阶段 Mock 仍然存在：
-
-```text
-模拟登录 → 固定任务 → 内存场次 → 固定样本 → Mock 提交 → 回执验证
-```
+Mock 通过不代表 Totoro、WMPF 或你的后台实机已验证。
 
 ## 目录
 
 | 路径 | 作用 |
 | --- | --- |
-| `src/cdp-observer.mjs` | CDP 连接、事件摘要、allowlisted auth capture |
-| `src/backend-config.mjs` | 自有后台配置校验 |
-| `src/owned-backend.mjs` | 固定的自有后台状态机 |
-| `src/run-generator.mjs` | synthetic test run 生成器 |
-| `src/web.mjs` | loopback-only 本地 Web/API |
-| `config/backend.example.json` | 后台配置模板 |
-| `docs/SELF_HOSTED_BACKEND.md` | 后台 contract |
-| `src/lab.mjs` | 原离线 Mock |
-| `upstreams.lock.json` | 上游参考版本与署名 |
+| `src/cdp-observer.mjs` | WMPF CDP 观察与 allowlisted Token 捕获 |
+| `src/totoro-config.mjs` | Totoro sidecar / capture 配置 |
+| `src/totoro-client.mjs` | Totoro 原生 HTTP API adapter |
+| `src/web.mjs` | Longmao 本地编排 API |
+| `web/` | 本地控制台 |
+| `src/lab.mjs` | 独立离线 Mock 基线 |
+| `upstreams.lock.json` | 当前核对的 Totoro / WMPF snapshots |
 
-## 上游
-
-- [yuyuyudlc/Totoro](https://github.com/yuyuyudlc/Totoro)：参考分阶段业务流程思想；Longmao 的自有后台 contract 与生成器为独立实现。
-- [evi0s/WMPFDebugger](https://github.com/evi0s/WMPFDebugger)：作为独立 sidecar 提供 WMPF remote-debug / CDP proxy。
-
-WMPFDebugger 上游声明 GPLv2；Longmao 不复制或打包其源码。详细来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+详细架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。

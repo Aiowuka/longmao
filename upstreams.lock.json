@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "checkedAt": "2026-09-20",
-  "purpose": "Attribution, inspected upstream snapshots, and interoperability status; not a package dependency lockfile.",
+  "purpose": "Attribution and tested sidecar interoperability snapshots; not a package dependency lockfile.",
   "sources": [
     {
       "name": "Totoro Sunrun",
@@ -11,15 +11,25 @@
       "licenseStatus": "unconfirmed",
       "reviewedFiles": [
         "README.md",
-        "package.json",
-        "lib/server/start-run.js"
+        "app/api/login/token/route.js",
+        "app/api/sunrun/tasks/route.js",
+        "app/api/sunrun/preview/route.js",
+        "app/api/sunrun/start/route.js",
+        "app/api/sunrun/run-job/route.js",
+        "lib/server/token-login.js",
+        "lib/server/sunrun-service.js",
+        "lib/server/run-preview.js",
+        "lib/server/run-data.js",
+        "lib/server/confirmed-run.js",
+        "lib/server/start-run.js",
+        "lib/server/run-queue.js"
       ],
-      "referenceRole": "Staged workflow reference only; Longmao uses an independently defined self-hosted backend contract and does not copy Totoro production request code.",
+      "referenceRole": "Optional local HTTP sidecar. Longmao delegates login validation, tasks, preview, run generation, start and queue/job logic to Totoro's existing APIs; no Totoro source is copied or vendored.",
       "vendored": false,
       "runtimeDependency": false,
       "creditedTo": "yuyuyudlc and Totoro contributors",
-      "integrated": false,
-      "integrationKind": "reference-only"
+      "integrated": true,
+      "integrationKind": "optional-sidecar-http"
     },
     {
       "name": "WMPFDebugger",
@@ -33,7 +43,7 @@
         "src/index.ts",
         "src/cli.ts"
       ],
-      "referenceRole": "Optional sidecar interoperability: Longmao connects to WMPFDebugger's loopback CDP proxy as an external client; no WMPFDebugger source or binary is vendored or launched by Longmao.",
+      "referenceRole": "Optional local CDP sidecar. Longmao connects to WMPFDebugger's loopback CDP proxy as an external client; no hook, Frida, protobuf, source or binary is vendored.",
       "vendored": false,
       "runtimeDependency": false,
       "creditedTo": "evi0s and WMPFDebugger contributors",

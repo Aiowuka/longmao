@@ -52,13 +52,13 @@ function stripAuthPrefix(value) {
 
 export class CdpObserver {
   constructor({
-    backendConfig = null,
+    captureConfig = null,
     url = 'ws://127.0.0.1:62000',
     wsFactory = null,
     commandTimeoutMs = 2000,
     maxEvents = 300,
   } = {}) {
-    this.backendConfig = backendConfig;
+    this.captureConfig = captureConfig;
     this.url = url;
     this.wsFactory = wsFactory || (target => {
       if (typeof globalThis.WebSocket !== 'function') throwError('WEBSOCKET_UNAVAILABLE');
@@ -87,9 +87,9 @@ export class CdpObserver {
       currentPage: this.currentPage,
       eventCount: this.timeline.length,
       auth: redactToken(this.token),
-      backendOrigin: this.backendConfig?.origin || null,
+      captureOrigin: this.captureConfig?.origin || null,
       lastError: this.lastError,
-      filtersActive: Boolean(this.backendConfig),
+      filtersActive: Boolean(this.captureConfig),
     };
   }
 
@@ -118,18 +118,18 @@ export class CdpObserver {
   }
 
   _allowedUrl(rawUrl) {
-    if (!this.backendConfig || typeof rawUrl !== 'string') return null;
+    if (!this.captureConfig || typeof rawUrl !== 'string') return null;
     try {
       const url = new URL(rawUrl);
-      return url.origin === this.backendConfig.origin ? url : null;
+      return url.origin === this.captureConfig.origin ? url : null;
     } catch {
       return null;
     }
   }
 
   _capturePath(url) {
-    return this.backendConfig.auth.capture.pathPrefixes.length === 0 ||
-      this.backendConfig.auth.capture.pathPrefixes.some(prefix => url.pathname.startsWith(prefix));
+    const prefixes = this.captureConfig.pathPrefixes;
+    return prefixes.length === 0 || prefixes.some(prefix => url.pathname.startsWith(prefix));
   }
 
   _captureToken(value, source) {
@@ -186,9 +186,7 @@ export class CdpObserver {
       throw error;
     });
 
-    socket.addEventListener('message', event => {
-      this.ingest(event.data);
-    });
+    socket.addEventListener('message', event => this.ingest(event.data));
     socket.addEventListener('close', () => {
       if (this.socket === socket) {
         this.state = 'disconnected';
@@ -232,8 +230,7 @@ export class CdpObserver {
       this.command('Page.enable'),
     ]);
     this.instrumented = results.every(result => result.status === 'fulfilled');
-    if (!this.instrumented) this.lastError = 'CDP_TARGET_NOT_RESPONDING';
-    else this.lastError = null;
+    this.lastError = this.instrumented ? null : 'CDP_TARGET_NOT_RESPONDING';
     return this.status();
   }
 
@@ -283,7 +280,7 @@ export class CdpObserver {
         path: url.pathname + url.search,
       });
       if (this._capturePath(url)) {
-        const found = headerValue(request.headers, this.backendConfig.auth.capture.requestHeaderNames);
+        const found = headerValue(request.headers, this.captureConfig.requestHeaderNames);
         if (found) this._captureToken(found.value, `request-header:${found.name.toLowerCase()}`);
       }
       return true;
@@ -300,8 +297,7 @@ export class CdpObserver {
         path: url.pathname + url.search,
         mimeType: response.mimeType || null,
       });
-      if (params.requestId && this._capturePath(url) &&
-          this.backendConfig.auth.capture.responseJsonPaths.length > 0) {
+      if (params.requestId && this._capturePath(url) && this.captureConfig.responseJsonPaths.length > 0) {
         this.pendingResponseBodies.set(params.requestId, url.href);
       }
       return true;
@@ -348,7 +344,7 @@ export class CdpObserver {
     } catch {
       return false;
     }
-    for (const path of this.backendConfig.auth.capture.responseJsonPaths) {
+    for (const path of this.captureConfig.responseJsonPaths) {
       const value = getPath(json, path);
       if (typeof value === 'string' && this._captureToken(value, `response-json:${path}`)) {
         this._record({kind: 'auth_response_matched', path: new URL(url).pathname});

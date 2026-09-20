@@ -1,8 +1,12 @@
-# Longmao 架构
+# Longmao 架构：Sidecar Reuse
 
-## 当前目标
+## 原则
 
-Longmao 是本机控制台。它把 WMPFDebugger 暴露的 CDP 代理、自有后台登录态和一个固定的测试跑步 contract 串起来，同时保留离线 Mock 作为回归基线。
+Longmao 不复刻 Totoro 的业务实现。
+
+凡是 Totoro 已经提供的能力，Longmao 通过 Totoro 本地 HTTP API 直接复用。
+
+## 运行结构
 
 ```text
 WeChat miniapp runtime
@@ -13,65 +17,91 @@ WMPFDebugger
   62000 CDP proxy
         │
         ▼
-CdpObserver
+Longmao CdpObserver
   ├─ Network / Runtime / Page
-  ├─ 只保留 backend.json.origin 的 Network 摘要
-  └─ Token 只驻留 Node 进程内存
+  ├─ allowlisted auth capture
+  └─ token only in memory
         │
         ▼
-SelfHostedBackend
-  profile? → tasks? → start → submit → receipt?
-        ▲
-        │
-Synthetic Run Generator
+Longmao TotoroClient
+        │  fixed localhost HTTP API
+        ▼
+Totoro (separate checkout/process)
+  ├─ token-login.js
+  ├─ sunrun-service.js
+  ├─ run-preview.js
+  ├─ run-data.js
+  ├─ confirmed-run.js
+  ├─ start-run.js
+  └─ run-queue.js
         │
         ▼
-Longmao Web
-http://127.0.0.1:3210
+Totoro-compatible backend
 ```
+
+## Longmao 允许调用的 Totoro 路径
+
+固定白名单：
+
+```text
+/api/login/token
+/api/sunrun/tasks
+/api/sunrun/preview
+/api/sunrun/start
+/api/sunrun/run-job
+```
+
+`TotoroClient.post()` 会拒绝其他路径。
+
+## Longmao 不再实现
+
+以下能力由 Totoro 唯一负责：
+
+- Token 业务验证；
+- 学生身份字段映射；
+- sunrun task model；
+- 跑步计划生成；
+- 路线 naturalization；
+- GPS jitter；
+- 时间戳生成；
+- 设备 profile；
+- getRunBegin；
+- 点位查询；
+- sunRunExercises；
+- sunRunExercisesDetail；
+- Redis 延迟队列；
+- Worker 最终完成；
+- Totoro 原生业务错误处理。
+
+因此 Longmao 不包含自己的 `run-generator`、`owned-backend` 或平行生产 contract。
 
 ## 信任边界
 
-### Web
+### Longmao Web
 
-- 固定绑定 `127.0.0.1`。
-- Host header 仅接受 localhost / 127.0.0.1。
+- 只绑定 `127.0.0.1`。
+- Host header 仅允许 localhost / 127.0.0.1。
 - CSP 禁止外部脚本和 iframe。
+
+### Totoro sidecar
+
+- `baseUrl` 必须是 loopback origin。
+- Longmao 不启动、不修改、不打包 Totoro。
+- Totoro 的业务后台配置继续由 Totoro 自己的环境变量管理。
 
 ### CDP
 
-- 只连接 `ws://127.0.0.1:62000`。
-- Network 时间线只记录配置 origin 的 path / method / status。
-- Console 只记录 level 和参数数量，不保存参数值。
-- Token 只从配置 origin + capture path 上捕获。
-- 原始 Token 不通过 Web API 返回，不落盘。
+- WMPFDebugger 仍作为独立 sidecar。
+- Longmao 只连接 loopback CDP。
+- 只有配置 capture origin 的请求可能触发 Token 捕获。
+- Token 不落盘，也不通过 API 返回明文。
 
-### 自有后台
+## 兼容性 snapshot
 
-- 远程 origin 必须 HTTPS；loopback 可使用 HTTP。
-- 端点必须是相对 path，只支持 GET / POST。
-- 不存在“任意 URL / Header / Body”重放 API。
-- 运行数据明确携带 `synthetic: true`。
-- 自有后台运行报告仅驻留内存；原离线 Mock 报告继续写入 `artifacts/last-report.json`。
-
-## 状态机
+当前 Longmao adapter 按以下 Totoro snapshot 核对：
 
 ```text
-connect_cdp
-  ↓
-capture_owned_backend_auth
-  ↓
-profile (optional)
-  ↓
-tasks (optional)
-  ↓
-generate_synthetic_run
-  ↓
-start
-  ↓
-submit
-  ↓
-receipt (optional)
+c499040d52c6e1d45f06f7949419799ccc770db9
 ```
 
-自有后台接入字段与示例见 [SELF_HOSTED_BACKEND.md](SELF_HOSTED_BACKEND.md)。
+如果 Totoro 后续修改上述五个 API 的 payload 或响应结构，应先更新 adapter contract tests，再升级 snapshot。

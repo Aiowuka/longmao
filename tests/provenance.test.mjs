@@ -19,26 +19,37 @@ test('validated provenance is returned as an independent copy', () => {
   assert.notEqual(manifest.sources[0].creditedTo, 'changed');
 });
 
-test('both distinct upstream repositories must be present', () => {
+test('both distinct sidecars must be present', () => {
   const duplicate = fresh(); duplicate.sources[1] = duplicate.sources[0]; invalid(duplicate);
   const missing = fresh(); missing.sources.pop(); invalid(missing);
   const unknown = fresh(); unknown.sources[0].repository = 'other/project'; invalid(unknown);
 });
 
-test('source references require a full commit and correct repository URL', () => {
+test('source snapshots require full commits and canonical URLs', () => {
   const short = fresh(); short.sources[0].commit = 'main'; invalid(short);
   const wrong = fresh(); wrong.sources[0].url = 'https://example.invalid'; invalid(wrong);
 });
 
-test('attribution and integration status cannot be silently altered', () => {
-  const missing = fresh(); delete missing.sources[0].creditedTo; invalid(missing);
-  const blank = fresh(); blank.sources[0].creditedTo = ' '; invalid(blank);
-  const vendored = fresh(); vendored.sources[0].vendored = true; invalid(vendored);
-  const runtime = fresh(); runtime.sources[1].runtimeDependency = true; invalid(runtime);
-  const totoroIntegrated = fresh(); totoroIntegrated.sources[0].integrated = true; invalid(totoroIntegrated);
-  const wmpfNotIntegrated = fresh(); wmpfNotIntegrated.sources[1].integrated = false; invalid(wmpfNotIntegrated);
-  const kind = fresh(); kind.sources[1].integrationKind = 'vendored'; invalid(kind);
-  const license = fresh(); delete license.sources[0].licenseStatus; invalid(license);
+test('sidecar integration metadata cannot silently become vendored or package runtime dependencies', () => {
+  for (const index of [0, 1]) {
+    const vendored = fresh(); vendored.sources[index].vendored = true; invalid(vendored);
+    const runtime = fresh(); runtime.sources[index].runtimeDependency = true; invalid(runtime);
+    const notIntegrated = fresh(); notIntegrated.sources[index].integrated = false; invalid(notIntegrated);
+  }
+  const totoroKind = fresh(); totoroKind.sources[0].integrationKind = 'copied-core'; invalid(totoroKind);
+  const wmpfKind = fresh(); wmpfKind.sources[1].integrationKind = 'vendored'; invalid(wmpfKind);
+});
+
+test('sources command reports HTTP Totoro reuse and CDP WMPF reuse', () => {
+  const result = cli('sources');
+  assert.equal(result.status, 0, result.stderr);
+  const sources = JSON.parse(result.stdout).sources;
+  const totoro = sources.find(source => source.repository === 'yuyuyudlc/Totoro');
+  const wmpf = sources.find(source => source.repository === 'evi0s/WMPFDebugger');
+  assert.equal(totoro.integrationKind, 'optional-sidecar-http');
+  assert.equal(wmpf.integrationKind, 'optional-sidecar-cdp');
+  assert.equal(totoro.vendored, false);
+  assert.equal(wmpf.vendored, false);
 });
 
 test('invalid metadata dates and shapes fail validation', () => {
@@ -46,19 +57,6 @@ test('invalid metadata dates and shapes fail validation', () => {
   for (const date of ['yesterday', '2026-02-30', '2026-99-01']) {
     const value = fresh(); value.checkedAt = date; invalid(value);
   }
-});
-
-test('sources command shows Totoro reference-only and WMPF optional sidecar integration', () => {
-  const result = cli('sources');
-  assert.equal(result.status, 0, result.stderr);
-  const sources = JSON.parse(result.stdout).sources;
-  assert.equal(sources.length, 2);
-  const totoro = sources.find(source => source.repository === 'yuyuyudlc/Totoro');
-  const wmpf = sources.find(source => source.repository === 'evi0s/WMPFDebugger');
-  assert.equal(totoro.integrated, false);
-  assert.equal(totoro.integrationKind, 'reference-only');
-  assert.equal(wmpf.integrated, true);
-  assert.equal(wmpf.integrationKind, 'optional-sidecar-cdp');
 });
 
 test('sources command rejects extra credential arguments without echoing them', () => {

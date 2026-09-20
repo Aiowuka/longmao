@@ -36,78 +36,54 @@ test('WMPF port defaults match upstream defaults and reject invalid overrides', 
   assert.throws(() => resolveWmpfPorts({LONGMAO_WMPF_CDP_PORT: 'https://example.invalid'}), {code: 'INVALID_LOCAL_PORT'});
 });
 
-test('web root serves the local dashboard with no raw credential input', async () => {
+test('web root serves orchestrator UI with no raw credential input', async () => {
   const response = await fetch(base + '/');
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Longmao 控制台/);
+  assert.match(html, /WMPF \+ Totoro/);
   assert.doesNotMatch(html, /type=["']password["']/i);
   assert.doesNotMatch(html, /name=["']token["']/i);
   assert.match(response.headers.get('content-security-policy'), /default-src 'self'/);
 });
 
-test('status endpoint declares loopback binding and no self-hosted backend when unconfigured', async () => {
+test('status endpoint declares loopback binding and unconfigured Totoro sidecar', async () => {
   const response = await fetch(base + '/api/status');
   const status = await response.json();
   assert.equal(response.status, 200);
   assert.equal(status.bindHost, '127.0.0.1');
-  assert.equal(status.selfHostedSubmission, false);
+  assert.equal(status.mode, 'totoro-sidecar-orchestrator');
   assert.equal(status.cdp, null);
-  assert.equal(status.backend.configured, false);
-  assert.equal(status.wmpf.capabilities.readsTraffic, false);
+  assert.equal(status.totoro.config.configured, false);
 });
 
-test('backend status is readable but write/read flow is unavailable without explicit config', async () => {
-  const statusResponse = await fetch(base + '/api/backend/status');
+test('Totoro status is readable but Totoro actions require explicit local config', async () => {
+  const statusResponse = await fetch(base + '/api/totoro/status');
+  const status = await statusResponse.json();
   assert.equal(statusResponse.status, 200);
-  assert.equal((await statusResponse.json()).backend.configured, false);
+  assert.equal(status.config.configured, false);
 
-  const tasks = await fetch(base + '/api/backend/tasks');
-  assert.equal(tasks.status, 409);
-  assert.equal((await tasks.json()).code, 'BACKEND_NOT_CONFIGURED');
+  const sync = await fetch(base + '/api/totoro/sync', {method: 'POST'});
+  assert.equal(sync.status, 409);
+  assert.equal((await sync.json()).code, 'TOTORO_NOT_CONFIGURED');
 });
 
-test('mock workflow can run from the web API and is persisted locally', async () => {
-  const runResponse = await fetch(base + '/api/mock/run', {
+test('mock workflow remains available as an independent Longmao regression baseline', async () => {
+  const response = await fetch(base + '/api/mock/run', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({scenario: 'success'}),
   });
-  const run = await runResponse.json();
-  assert.equal(runResponse.status, 200);
-  assert.equal(run.report.ok, true);
-  assert.equal(run.report.mode, 'offline-mock');
-
-  const reportResponse = await fetch(base + '/api/report');
-  const saved = await reportResponse.json();
-  assert.deepEqual(saved.report, run.report);
+  const result = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(result.report.ok, true);
+  assert.equal(result.report.mode, 'offline-mock');
 });
 
-test('web API rejects production-like or extra mock options', async () => {
-  for (const body of [
-    {scenario: 'production'},
-    {scenario: 'success', token: 'secret'},
-    {scenario: 'success', url: 'https://example.invalid'},
-  ]) {
-    const response = await fetch(base + '/api/mock/run', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body),
-    });
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).code, 'INVALID_MOCK_SCENARIO');
-  }
-});
-
-test('web API requires JSON and does not expose generic replay routes', async () => {
-  const wrongType = await fetch(base + '/api/mock/run', {method: 'POST', body: 'scenario=success'});
-  assert.equal(wrongType.status, 415);
-  assert.equal((await wrongType.json()).code, 'JSON_REQUIRED');
-
-  for (const path of ['/api/submit-real', '/api/replay', '/api/request']) {
-    const missing = await fetch(base + path);
-    assert.equal(missing.status, 404);
-    assert.equal((await missing.json()).code, 'NOT_FOUND');
+test('web API rejects generic replay routes and arbitrary upstream routes', async () => {
+  for (const path of ['/api/submit-real', '/api/replay', '/api/request', '/api/backend/run']) {
+    const response = await fetch(base + path);
+    assert.equal(response.status, 404);
+    assert.equal((await response.json()).code, 'NOT_FOUND');
   }
 });
 

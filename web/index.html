@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>Longmao Local Lab</title>
+  <title>Longmao Local Orchestrator</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <main class="shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">LOCAL AUTOMATION LAB</p>
-        <h1>Longmao 控制台</h1>
-        <p class="lead">WMPFDebugger → CDP → 自有后台登录态 → 本地生成测试跑步数据 → start / submit / receipt。Longmao Web 本身只监听 127.0.0.1。</p>
+        <p class="eyebrow">LONGMAO · LOCAL ORCHESTRATOR</p>
+        <h1>WMPF + Totoro</h1>
+        <p class="lead">Longmao 只做本地编排：WMPFDebugger 提供 CDP，Totoro 负责登录验证、任务、预览、轨迹生成、开始流程和延迟任务。</p>
       </div>
       <div class="hero-status">
         <span id="overall-badge" class="badge neutral">检查中</span>
@@ -26,7 +26,7 @@
         <div class="card-head">
           <div>
             <p class="kicker">WMPF SIDECAR</p>
-            <h2>调试桥</h2>
+            <h2>微信运行时桥</h2>
           </div>
           <span id="wmpf-badge" class="badge neutral">检查中</span>
         </div>
@@ -40,54 +40,54 @@
       <article class="card">
         <div class="card-head">
           <div>
-            <p class="kicker">CDP SESSION</p>
-            <h2>小程序运行时</h2>
+            <p class="kicker">CDP OBSERVER</p>
+            <h2>登录态捕获</h2>
           </div>
           <span id="cdp-badge" class="badge neutral">未连接</span>
         </div>
         <dl class="kv">
           <div><dt>Instrumentation</dt><dd id="cdp-instrumented">—</dd></div>
-          <div><dt>当前页面</dt><dd id="cdp-page">—</dd></div>
+          <div><dt>Capture origin</dt><dd id="capture-origin">—</dd></div>
           <div><dt>Token</dt><dd id="cdp-token">未捕获</dd></div>
           <div><dt>事件</dt><dd id="cdp-event-count">0</dd></div>
         </dl>
         <div class="actions">
           <button id="cdp-connect">连接 CDP</button>
           <button id="cdp-disconnect" class="secondary">断开</button>
-          <button id="cdp-clear-auth" class="secondary">清除 Token</button>
+          <button id="cdp-clear-auth" class="secondary">清 Token</button>
         </div>
       </article>
 
-      <article class="card">
+      <article class="card wide">
         <div class="card-head">
           <div>
-            <p class="kicker">OWNED BACKEND</p>
-            <h2>自有后台</h2>
+            <p class="kicker">TOTORO SIDECAR</p>
+            <h2>业务核心复用</h2>
           </div>
-          <span id="backend-badge" class="badge neutral">未配置</span>
+          <span id="totoro-badge" class="badge neutral">未配置</span>
         </div>
         <dl class="kv">
-          <div><dt>Origin</dt><dd id="backend-origin">—</dd></div>
-          <div><dt>配置文件</dt><dd id="backend-config-path">—</dd></div>
-          <div><dt>登录态</dt><dd id="backend-auth">—</dd></div>
-          <div><dt>最近运行</dt><dd id="backend-latest">—</dd></div>
+          <div><dt>Base URL</dt><dd id="totoro-base">—</dd></div>
+          <div><dt>Health</dt><dd id="totoro-health">—</dd></div>
+          <div><dt>Profile</dt><dd id="totoro-profile">—</dd></div>
+          <div><dt>任务数</dt><dd id="totoro-task-count">0</dd></div>
+          <div><dt>最近运行</dt><dd id="totoro-last-run">—</dd></div>
         </dl>
         <div class="actions">
-          <button id="backend-profile" class="secondary">读取 Profile</button>
-          <button id="backend-tasks" class="secondary">读取 Tasks</button>
+          <button id="totoro-sync">用捕获 Token 同步 Totoro</button>
+          <button id="totoro-jobs" class="secondary">刷新延迟任务</button>
         </div>
-        <pre id="backend-data" class="compact-pre">尚未读取。</pre>
       </article>
 
       <article class="card">
         <div class="card-head">
           <div>
             <p class="kicker">MOCK BASELINE</p>
-            <h2>离线回归流程</h2>
+            <h2>Longmao 自身回归</h2>
           </div>
           <span class="badge safe">Mock</span>
         </div>
-        <p class="hint">保留原来的离线状态机，用来确认 Longmao 自身没有因为真实接线而回归。</p>
+        <p class="hint">这部分只验证 Longmao 自己的本地控制流，不参与 Totoro 业务链。</p>
         <div class="actions">
           <button data-scenario="success">成功流程</button>
           <button data-scenario="expired-session" class="secondary">会话过期</button>
@@ -99,21 +99,41 @@
     <section class="panel">
       <div class="panel-head">
         <div>
-          <p class="kicker">SELF-HOSTED RUN</p>
-          <h2>生成并提交测试跑步</h2>
+          <p class="kicker">TOTORO FLOW</p>
+          <h2>任务 → 路线 → Preview → Start</h2>
         </div>
-        <span id="real-run-badge" class="badge neutral">等待</span>
+        <span id="flow-badge" class="badge neutral">等待同步</span>
       </div>
-      <p class="hint">只提交到 <code>config/backend.json</code> 配置的自有后台。生成的数据始终带 <code>synthetic: true</code>。</p>
-      <form id="run-form" class="run-form">
-        <label>Task ID<input name="taskId" value="demo-task" maxlength="128" required></label>
-        <label>距离（m）<input name="distanceMeters" type="number" value="3000" min="100" max="50000" required></label>
-        <label>时长（s）<input name="durationSeconds" type="number" value="1200" min="30" max="86400" required></label>
-        <label>中心纬度<input name="centerLat" type="number" step="0.000001" value="31.2304" min="-85" max="85" required></label>
-        <label>中心经度<input name="centerLon" type="number" step="0.000001" value="121.4737" min="-180" max="180" required></label>
-        <button type="submit">开始完整链路</button>
-      </form>
-      <pre id="real-report">尚未运行。</pre>
+      <div class="selector-grid">
+        <label>任务
+          <select id="task-select" disabled><option value="">先同步 Totoro</option></select>
+        </label>
+        <label>路线
+          <select id="route-select" disabled><option value="">—</option></select>
+        </label>
+        <button id="preview-button" disabled>生成 Totoro Preview</button>
+        <button id="start-button" disabled>交给 Totoro 开始</button>
+      </div>
+      <div class="split">
+        <div>
+          <p class="subhead">Preview</p>
+          <pre id="preview-output">尚未生成。</pre>
+        </div>
+        <div>
+          <p class="subhead">Start / Queue result</p>
+          <pre id="start-output">尚未开始。</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">TOTORO JOBS</p>
+          <h2>延迟任务</h2>
+        </div>
+      </div>
+      <pre id="jobs-output">尚未读取。</pre>
     </section>
 
     <section class="panel">
@@ -123,11 +143,11 @@
           <h2>允许域名事件</h2>
         </div>
         <div class="actions tight">
-          <button id="events-refresh" class="secondary">刷新事件</button>
+          <button id="events-refresh" class="secondary">刷新</button>
           <button id="events-clear" class="secondary">清空</button>
         </div>
       </div>
-      <p class="hint">Network 只记录已配置 backend origin 的路径、方法和状态码；Console 只记录级别与参数数量，不展示参数值。</p>
+      <p class="hint">仅显示配置 capture origin 的请求路径/状态；Console 只记录级别和参数数量。</p>
       <div id="events" class="event-list"><p class="muted">暂无事件。</p></div>
     </section>
 
@@ -146,14 +166,14 @@
       <div class="panel-head">
         <div>
           <p class="kicker">UPSTREAMS</p>
-          <h2>来源与状态</h2>
+          <h2>复用关系</h2>
         </div>
       </div>
       <div id="sources" class="sources"></div>
     </section>
 
     <footer>
-      <span>Longmao Local Lab</span>
+      <span>Longmao Local Orchestrator</span>
       <span id="runtime">—</span>
     </footer>
   </main>

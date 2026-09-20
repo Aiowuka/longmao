@@ -6,6 +6,6 @@ artifacts/
 *.har
 *.tmp
 vendor/
-config/backend.json
+config/totoro.json
 .DS_Store
 Thumbs.db

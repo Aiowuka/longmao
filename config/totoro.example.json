@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "baseUrl": "http://127.0.0.1:3000",
+  "capture": {
+    "origin": "https://your-backend.example",
+    "pathPrefixes": [
+      "/wxxcx/"
+    ],
+    "requestHeaderNames": [
+      "authorization"
+    ],
+    "responseJsonPaths": [
+      "token",
+      "data.token"
+    ]
+  }
+}

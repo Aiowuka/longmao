@@ -1,13 +1,12 @@
 import {LabError} from './lab.mjs';
 
 const expected = new Map([
-  ['yuyuyudlc/Totoro', {integrated: false, integrationKind: 'reference-only'}],
+  ['yuyuyudlc/Totoro', {integrated: true, integrationKind: 'optional-sidecar-http'}],
   ['evi0s/WMPFDebugger', {integrated: true, integrationKind: 'optional-sidecar-cdp'}],
 ]);
 const plainObject = value => value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype;
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;
 
-/** Validate attribution/interoperability metadata only. This never downloads or executes upstream code. */
 export function validateSourceManifest(manifest) {
   const fail = () => { throw new LabError('INVALID_SOURCE_MANIFEST'); };
   if (!plainObject(manifest) || manifest.schemaVersion !== 1 ||
