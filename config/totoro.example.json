@@ -12,6 +12,7 @@
     "responseJsonPaths": [
       "token",
       "data.token"
-    ]
+    ],
+    "allowTokenReveal": false
   }
 }
