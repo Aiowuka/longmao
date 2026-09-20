@@ -467,3 +467,118 @@ test('CDP observer routes Runtime.evaluate through the WMPF jscontext that expos
   assert.ok(observer.events().some(event => event.kind === 'wmpf_jscontext_selected' && event.id === 'app-js'));
   assert.ok(observer.events().some(event => event.kind === 'wx_context_found' && event.jscontextId === 'app-js'));
 });
+
+
+test('CDP observer network-only mode stops storage polling on WMPF network debug signal', async () => {
+  class FakeSocket {
+    constructor() {
+      this.readyState = 1;
+      this.listeners = new Map();
+    }
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+    send(raw) {
+      const message = JSON.parse(raw);
+      let result = {};
+      if (message.method === 'Runtime.evaluate') {
+        result = {result: {type: 'object', value: {hasWx: false, token: '', keys: []}}};
+      } else if (message.method === 'Longmao.getJsContexts') {
+        result = {contexts: [], activeId: null};
+      }
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+  }
+
+  const socket = new FakeSocket();
+  const observer = new CdpObserver({
+    wsFactory: () => socket,
+    commandTimeoutMs: 50,
+    authRetryIntervalMs: 5,
+    authRetryAttempts: 20,
+  });
+  observer.socket = socket;
+  observer.state = 'connected';
+  observer.instrumented = true;
+  socket.addEventListener('message', event => observer.ingest(event.data));
+
+  observer._scheduleAuthRetry();
+  assert.equal(observer.status().authRetrying, true);
+
+  observer.ingest({
+    method: 'Longmao.networkDebugAvailable',
+    params: {source: '__networkDebug'},
+  });
+
+  const status = observer.status();
+  assert.equal(status.capabilityMode, 'NETWORK_ONLY');
+  assert.equal(status.networkDebugSource, '__networkDebug');
+  assert.equal(status.runtimeAvailable, false);
+  assert.equal(status.authRetrying, false);
+  assert.equal(status.authRetryCount, 0);
+
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(observer.status().authRetryCount, 0);
+  assert.ok(observer.events().some(event =>
+    event.kind === 'cdp_capability_mode' && event.mode === 'NETWORK_ONLY'));
+});
+
+test('CDP observer can recover from network-only mode when a WMPF JSContext appears', async () => {
+  class FakeSocket {
+    constructor() {
+      this.readyState = 1;
+      this.listeners = new Map();
+    }
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+    send(raw) {
+      const message = JSON.parse(raw);
+      let result = {};
+      if (message.method === 'Longmao.getJsContexts') {
+        result = {contexts: [{id: 'app-js', name: 'app-service'}], activeId: 'app-js'};
+      } else if (message.method === 'Longmao.connectJsContext') {
+        result = {activeId: 'app-js'};
+      } else if (message.method === 'Runtime.evaluate') {
+        result = {result: {type: 'object', value: {
+          hasWx: true,
+          token: 'recovered-runtime-token',
+          keys: ['token'],
+        }}};
+      }
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+  }
+
+  const socket = new FakeSocket();
+  const observer = new CdpObserver({wsFactory: () => socket, commandTimeoutMs: 50});
+  observer.socket = socket;
+  observer.state = 'connected';
+  observer.instrumented = true;
+  socket.addEventListener('message', event => observer.ingest(event.data));
+
+  observer.ingest({
+    method: 'Longmao.networkDebugAvailable',
+    params: {source: '__networkDebug'},
+  });
+  assert.equal(observer.status().capabilityMode, 'NETWORK_ONLY');
+
+  observer.ingest({
+    method: 'Longmao.jsContextAdded',
+    params: {id: 'app-js', name: 'app-service'},
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(observer.status().capabilityMode, 'FULL_RUNTIME');
+  assert.equal(observer.getToken(), 'recovered-runtime-token');
+});
