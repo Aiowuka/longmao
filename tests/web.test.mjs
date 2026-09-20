@@ -618,3 +618,57 @@ test('CDP observer records sanitized network-only metadata without credential ma
   assert.equal(event.matchedCaptureOrigin, true);
   assert.doesNotMatch(JSON.stringify(event), /should-not-appear|authorization|body|query/i);
 });
+
+
+test('CDP observer reports unavailable WMPF routing and does not spam instrumented events', async () => {
+  class FakeSocket {
+    constructor() {
+      this.readyState = 0;
+      this.listeners = new Map();
+      queueMicrotask(() => {
+        this.readyState = 1;
+        this.emit('open', {});
+      });
+    }
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+    send(raw) {
+      const message = JSON.parse(raw);
+      if (message.method === 'Longmao.getJsContexts') {
+        queueMicrotask(() => this.emit('message', {data: JSON.stringify({
+          id: message.id,
+          error: {code: -32601, message: 'method not found'},
+        })}));
+        return;
+      }
+      const result = message.method === 'Runtime.evaluate'
+        ? {result: {type: 'object', value: {hasWx: false, token: '', keys: []}}}
+        : {};
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+    close() {
+      this.readyState = 3;
+      this.emit('close', {});
+    }
+  }
+
+  const observer = new CdpObserver({
+    wsFactory: () => new FakeSocket(),
+    commandTimeoutMs: 50,
+    authRetryIntervalMs: 1000,
+  });
+  await observer.connect();
+  await observer.instrument();
+
+  const events = observer.events(100);
+  assert.equal(events.filter(event => event.kind === 'cdp_instrumented').length, 1);
+  assert.equal(events.filter(event => event.kind === 'wmpf_routing_unavailable').length, 1);
+  assert.equal(observer.status().wmpfRoutingAvailable, false);
+  observer.disconnect();
+});
