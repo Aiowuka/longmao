@@ -81,7 +81,8 @@ test('Linux runtime stack is loopback-only and delegates business logic to Totor
   assert.match(source, /127\.0\.0\.1/);
   assert.match(source, /pnpm@10 start/);
   assert.match(source, /pnpm@10 worker:run/);
-  assert.match(source, /npx ts-node src\/index\.ts --auto-detect/);
+  assert.match(source, /npx ts-node src\/index\.ts/);
+  assert.doesNotMatch(source, /src\/index\.ts --auto-detect/);
   assert.match(source, /node src\/web\.mjs/);
 });
 
