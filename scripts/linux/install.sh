@@ -2,7 +2,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-# shellcheck source=common.sh
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/common.sh"
 
 TOTORO_REPO='https://github.com/yuyuyudlc/Totoro.git'
@@ -45,7 +45,7 @@ ensure_node22() {
   fi
 
   say '安装 Longmao 私有 Node.js 22 runtime'
-  local tmp sums file expected actual version
+  local tmp file expected actual version
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
   curl --fail --location --retry 3 --silent --show-error     https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt -o "$tmp/SHASUMS256.txt"
@@ -142,7 +142,7 @@ ensure_node22
 mkdir -p "$LONGMAO_UPSTREAMS" "$LONGMAO_LOGS" "$LONGMAO_CONFIG_ROOT_RESOLVED"
 copy_longmao
 
-# shellcheck source=common.sh
+# shellcheck disable=SC1091
 source "$LONGMAO_INSTALL_ROOT_RESOLVED/scripts/linux/common.sh"
 export PATH="$LONGMAO_NODE_ROOT/bin:$LONGMAO_BIN_ROOT_RESOLVED:$PATH"
 

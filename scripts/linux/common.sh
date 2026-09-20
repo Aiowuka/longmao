@@ -21,6 +21,7 @@ longmao_bin_root() {
 ' "${LONGMAO_BIN_ROOT:-$HOME/.local/bin}"
 }
 
+# shellcheck disable=SC2034
 longmao_paths() {
   LONGMAO_INSTALL_ROOT_RESOLVED="$(longmao_install_root)"
   LONGMAO_RUNTIME_ROOT_RESOLVED="$(longmao_runtime_root)"
