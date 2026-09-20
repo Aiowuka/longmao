@@ -147,3 +147,10 @@ test('Linux managed processes inherit the Longmao private runtime PATH', async (
   assert.doesNotMatch(source, /nohup bash -lc/);
   assert.match(source, /export PATH="\$LONGMAO_NODE_ROOT\/bin:\$LONGMAO_BIN_ROOT_RESOLVED:\$PATH"/);
 });
+
+
+test('Linux managed commands support leading environment assignments', async () => {
+  const source = await read('scripts/linux/common.sh');
+  assert.match(source, /nohup bash -c "\$command"/);
+  assert.doesNotMatch(source, /bash -c "exec \$command"/);
+});
