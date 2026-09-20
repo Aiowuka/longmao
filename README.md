@@ -41,6 +41,48 @@ Totoro 和 WMPFDebugger 不被复制进 Longmao 仓库，也不被打进 Longmao
 Install Longmao.cmd
 ```
 
+
+## Linux 普通用户：直接运行 .run
+
+使用 Actions / Release 生成的：
+
+```text
+LongmaoSetup-0.5.0-linux-x64.run
+```
+
+安装：
+
+```bash
+chmod +x LongmaoSetup-0.5.0-linux-x64.run
+./LongmaoSetup-0.5.0-linux-x64.run
+```
+
+当前完整 Linux 一键安装器支持 x86_64，并自动处理 Debian/Ubuntu、Fedora/RHEL、Arch 三类常见发行版。
+
+它会：
+
+1. 检查 Git/curl/xz/Python/编译工具/redis-server；
+2. 缺失时通过 apt/dnf/pacman 安装；
+3. 如果系统 Node <22，从 nodejs.org 下载官方 `latest-v22.x` Linux x64 runtime，并校验官方 SHA-256；
+4. 从上游 GitHub 拉取 pinned Totoro/WMPFDebugger；
+5. 安装依赖、配置后台、build Totoro；
+6. 创建 `longmao` / `longmao-stop` / `longmao-status` / `longmao-configure` / `longmao-repair` / `longmao-uninstall` 命令；
+7. 自动启动完整本地栈。
+
+完整卸载：
+
+```bash
+longmao-uninstall
+```
+
+保留配置卸载：
+
+```bash
+longmao-uninstall --keep-config
+```
+
+Linux 用户手册见 [docs/LINUX_USER_GUIDE.md](docs/LINUX_USER_GUIDE.md)。
+
 ## 每次使用
 
 以后通常只需要：
@@ -82,13 +124,21 @@ Longmao 页面点“连接 CDP”
 | WMPF CDP | `127.0.0.1:62000` | Chrome DevTools Protocol |
 | Longmao | `127.0.0.1:3210` | 用户控制台 |
 
-Runtime、配置和日志放在：
+Windows Runtime：
 
 ```text
 %LOCALAPPDATA%\LongmaoRuntime
 ```
 
-而不是安装目录。
+Linux：
+
+```text
+~/.local/opt/longmao          # Longmao 程序
+~/.local/share/longmao        # upstreams / node / redis / logs / pids
+~/.config/longmao             # 配置
+```
+
+运行数据与程序安装目录分离。
 
 ## 快捷方式
 
@@ -188,6 +238,8 @@ npm run sources
 - Windows / Node 24
 - Windows PowerShell installer script parse
 - Inno Setup EXE build
+- Linux bash syntax / shellcheck
+- Makeself .run build + archive content inspection
 
 ## 目录
 
@@ -197,9 +249,12 @@ npm run sources
 | `src/totoro-config.mjs` | Totoro sidecar / capture 配置 |
 | `src/totoro-client.mjs` | Totoro 原生 HTTP API adapter |
 | `src/web.mjs` | Longmao 本地编排 API |
-| `scripts/windows/` | 一键安装、启动、停止、修复、状态脚本 |
-| `installer/windows/` | Inno Setup 安装包定义 |
-| `docs/USER_GUIDE.md` | 普通用户使用手册 |
+| `scripts/windows/` | Windows 一键安装、启动、停止、修复、状态脚本 |
+| `installer/windows/` | Inno Setup Windows 安装包定义 |
+| `scripts/linux/` | Linux 安装、启动、停止、状态、修复、卸载脚本 |
+| `installer/linux/` | Makeself Linux `.run` 安装包定义 |
+| `docs/USER_GUIDE.md` | Windows 普通用户使用手册 |
+| `docs/LINUX_USER_GUIDE.md` | Linux 普通用户使用手册 |
 | `upstreams.lock.json` | 当前核对的 Totoro / WMPF snapshots |
 
 详细架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
