@@ -203,3 +203,57 @@ test('CDP observer reads the miniapp token from wx storage without exposing arbi
   assert.ok(observer.events().some(event => event.kind === 'auth_captured' && event.source === 'wx-storage:token'));
   observer.disconnect();
 });
+
+
+test('CDP observer polls wx storage until login completes', async () => {
+  let evaluateCount = 0;
+  class FakeSocket {
+    constructor() {
+      this.readyState = 0;
+      this.listeners = new Map();
+      queueMicrotask(() => {
+        this.readyState = 1;
+        this.emit('open', {});
+      });
+    }
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+    send(raw) {
+      const message = JSON.parse(raw);
+      let result = {};
+      if (message.method === 'Runtime.evaluate') {
+        evaluateCount += 1;
+        result = {result: {type: 'string', value: evaluateCount >= 3 ? 'late-login-token' : ''}};
+      }
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+    close() {
+      this.readyState = 3;
+      this.emit('close', {});
+    }
+  }
+
+  const observer = new CdpObserver({
+    wsFactory: () => new FakeSocket(),
+    commandTimeoutMs: 50,
+    authRetryIntervalMs: 5,
+    authRetryAttempts: 10,
+  });
+  const initial = await observer.connect();
+  assert.equal(initial.instrumented, true);
+  assert.equal(initial.auth.present, false);
+  assert.equal(initial.authRetrying, true);
+
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.equal(observer.getToken(), 'late-login-token');
+  assert.equal(observer.status().auth.source, 'wx-storage:token');
+  assert.equal(observer.status().authRetrying, false);
+  assert.ok(observer.events().some(event => event.kind === 'auth_storage_retry'));
+  observer.disconnect();
+});

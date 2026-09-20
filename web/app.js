@@ -58,7 +58,7 @@ function renderCdp(cdp) {
   $('#cdp-event-count').textContent = String(cdp.eventCount || 0);
   $('#cdp-token').textContent = cdp.auth?.present
     ? `${cdp.auth.preview} · ${cdp.auth.length} chars · ${cdp.auth.source}`
-    : '未捕获';
+    : (cdp.authRetrying ? `等待登录态 · 自动重试 ${cdp.authRetryCount || 0}/${cdp.authRetryLimit || 0}` : '未捕获');
 }
 
 function renderTotoro(status) {
@@ -227,6 +227,7 @@ function renderEvents(events) {
     else if (event.kind === 'cdp_instrument_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
     else if (event.kind === 'cdp_instrumented') detail.textContent = 'Network / Runtime / Page ready';
     else if (event.kind === 'auth_storage_capture_failed') detail.textContent = event.code || 'storage read failed';
+    else if (event.kind === 'auth_storage_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
     else detail.textContent = event.code || '';
     const time = document.createElement('time');
     time.textContent = event.at ? new Date(event.at).toLocaleTimeString() : '';

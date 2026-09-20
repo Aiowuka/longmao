@@ -59,6 +59,8 @@ export class CdpObserver {
     maxEvents = 300,
     targetRetryIntervalMs = 1000,
     targetRetryAttempts = 30,
+    authRetryIntervalMs = 1000,
+    authRetryAttempts = 60,
   } = {}) {
     this.captureConfig = captureConfig;
     this.url = url;
@@ -70,14 +72,21 @@ export class CdpObserver {
     this.maxEvents = maxEvents;
     this.targetRetryIntervalMs = targetRetryIntervalMs;
     this.targetRetryLimit = targetRetryAttempts;
+    this.authRetryIntervalMs = authRetryIntervalMs;
+    this.authRetryLimit = authRetryAttempts;
+    this.authRetryTimer = null;
+    this.authRetryCount = 0;
     this.targetRetryTimer = null;
     this.targetRetryCount = 0;
     this.socket = null;
     this.state = 'disconnected';
     this.instrumented = false;
     if (this.targetRetryTimer) clearTimeout(this.targetRetryTimer);
+    if (this.authRetryTimer) clearTimeout(this.authRetryTimer);
     this.targetRetryTimer = null;
+    this.authRetryTimer = null;
     this.targetRetryCount = 0;
+    this.authRetryCount = 0;
     this.lastError = null;
     this.nextId = 1;
     this.pending = new Map();
@@ -105,6 +114,9 @@ export class CdpObserver {
           this.targetRetryCount > 0 && this.targetRetryCount < this.targetRetryLimit),
       targetRetryCount: this.targetRetryCount,
       targetRetryLimit: this.targetRetryLimit,
+      authRetrying: Boolean(this.authRetryTimer),
+      authRetryCount: this.authRetryCount,
+      authRetryLimit: this.authRetryLimit,
     };
   }
 
@@ -119,6 +131,8 @@ export class CdpObserver {
 
   clearAuth() {
     this.token = null;
+    this.authRetryCount = 0;
+    if (this.instrumented) this._scheduleAuthRetry();
     return this.status();
   }
 
@@ -151,6 +165,9 @@ export class CdpObserver {
     const token = stripAuthPrefix(String(value || ''));
     if (!token || token.length < 8 || token.length > 8192) return false;
     this.token = {value: token, source, capturedAt: new Date().toISOString()};
+    if (this.authRetryTimer) clearTimeout(this.authRetryTimer);
+    this.authRetryTimer = null;
+    this.authRetryCount = 0;
     this._record({kind: 'auth_captured', source, tokenLength: token.length});
     return true;
   }
@@ -271,14 +288,35 @@ export class CdpObserver {
       this.targetRetryTimer = null;
       this.targetRetryCount = 0;
       this._record({kind: 'cdp_instrumented'});
-      await this.captureStoredToken().catch(error => {
+      const captured = await this.captureStoredToken().catch(error => {
         this._record({kind: 'auth_storage_capture_failed', code: error?.code || 'CDP_STORAGE_READ_FAILED'});
+        return false;
       });
+      if (!captured && !this.token) this._scheduleAuthRetry();
     } else {
       this.lastError = 'CDP_TARGET_NOT_RESPONDING';
       this._scheduleInstrumentationRetry();
     }
     return this.status();
+  }
+
+  _scheduleAuthRetry() {
+    if (this.authRetryTimer || this.token || !this.instrumented || this.state !== 'connected') return;
+    if (this.authRetryCount >= this.authRetryLimit) return;
+
+    this.authRetryTimer = setTimeout(async () => {
+      this.authRetryTimer = null;
+      if (this.token || !this.instrumented || this.state !== 'connected') return;
+      this.authRetryCount += 1;
+      this._record({kind: 'auth_storage_retry', attempt: this.authRetryCount, limit: this.authRetryLimit});
+      try {
+        const captured = await this.captureStoredToken();
+        if (!captured && !this.token) this._scheduleAuthRetry();
+      } catch (error) {
+        this._record({kind: 'auth_storage_capture_failed', code: error?.code || 'CDP_STORAGE_READ_FAILED'});
+        this._scheduleAuthRetry();
+      }
+    }, this.authRetryIntervalMs);
   }
 
   async captureStoredToken() {
