@@ -11,7 +11,7 @@ for arg in "$@"; do
     --keep-config) keep_config=1 ;;
     -y|--yes) assume_yes=1 ;;
     -h|--help)
-      printf 'Usage: longmao-uninstall [--keep-config] [--yes]\n'
+      printf 'Usage: longmao uninstall [--keep-config] [--yes]\n'
       exit 0
       ;;
     *) die "未知参数: $arg" ;;

@@ -109,3 +109,21 @@ test('Linux .run build excludes local config and generated installer output', as
   assert.match(source, /makeself/);
   assert.match(source, /scripts\/linux\/install\.sh/);
 });
+
+
+test('Linux exposes one unified longmao subcommand CLI', async () => {
+  const cli = await read('scripts/linux/longmao.sh');
+  for (const command of ['start', 'stop', 'restart', 'status', 'configure', 'repair', 'logs', 'open', 'version', 'uninstall', 'help']) {
+    assert.match(cli, new RegExp('\\b' + command.replace('-', '\\-') + '\\b'));
+  }
+  assert.match(cli, /Usage:/);
+  assert.match(cli, /Longmao 0\.5\.0/);
+});
+
+test('Linux installer makes longmao the primary command and keeps legacy wrappers as aliases', async () => {
+  const source = await read('scripts/linux/install.sh');
+  assert.match(source, /scripts\/linux\/longmao\.sh/);
+  assert.match(source, /longmao" "\$action"/);
+  assert.match(source, /longmao start/);
+  assert.match(source, /longmao uninstall/);
+});

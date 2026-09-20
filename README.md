@@ -66,19 +66,34 @@ chmod +x LongmaoSetup-0.5.0-linux-x64.run
 3. 如果系统 Node <22，从 nodejs.org 下载官方 `latest-v22.x` Linux x64 runtime，并校验官方 SHA-256；
 4. 从上游 GitHub 拉取 pinned Totoro/WMPFDebugger；
 5. 安装依赖、配置后台、build Totoro；
-6. 创建 `longmao` / `longmao-stop` / `longmao-status` / `longmao-configure` / `longmao-repair` / `longmao-uninstall` 命令；
+6. 创建统一的 `longmao <command>` CLI，并保留旧命令作为兼容别名；
 7. 自动启动完整本地栈。
 
 完整卸载：
 
 ```bash
-longmao-uninstall
+longmao uninstall
 ```
 
 保留配置卸载：
 
 ```bash
-longmao-uninstall --keep-config
+longmao uninstall --keep-config
+```
+
+Linux 安装后统一使用：
+
+```bash
+longmao start
+longmao stop
+longmao restart
+longmao status
+longmao configure
+longmao repair
+longmao logs
+longmao open
+longmao version
+longmao uninstall
 ```
 
 Linux 用户手册见 [docs/LINUX_USER_GUIDE.md](docs/LINUX_USER_GUIDE.md)。

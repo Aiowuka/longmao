@@ -5,11 +5,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 [[ -d "$LONGMAO_INSTALL_ROOT_RESOLVED" ]] || die 'Longmao 尚未安装。'
-[[ -f "$LONGMAO_CONFIG_FILE" ]] || die 'Longmao 尚未配置，请运行 longmao-configure。'
-[[ -d "$LONGMAO_TOTORO" ]] || die 'Totoro runtime 缺失，请运行 longmao-repair。'
-[[ -d "$LONGMAO_WMPF" ]] || die 'WMPFDebugger runtime 缺失，请运行 longmao-repair。'
-command_exists node || die 'Node.js runtime 不可用，请运行 longmao-repair。'
-command_exists redis-server || die 'redis-server 不可用，请运行 longmao-repair。'
+[[ -f "$LONGMAO_CONFIG_FILE" ]] || die 'Longmao 尚未配置，请运行 longmao configure。'
+[[ -d "$LONGMAO_TOTORO" ]] || die 'Totoro runtime 缺失，请运行 longmao repair。'
+[[ -d "$LONGMAO_WMPF" ]] || die 'WMPFDebugger runtime 缺失，请运行 longmao repair。'
+command_exists node || die 'Node.js runtime 不可用，请运行 longmao repair。'
+command_exists redis-server || die 'redis-server 不可用，请运行 longmao repair。'
 
 mkdir -p "$LONGMAO_LOGS" "$LONGMAO_PIDS" "$LONGMAO_RUNTIME_ROOT_RESOLVED/redis"
 

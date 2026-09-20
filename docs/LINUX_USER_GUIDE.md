@@ -76,11 +76,7 @@ Longmao 不会把 Totoro 或 WMPFDebugger 源码预先打包进安装器。
 
 ```text
 ~/.local/bin/longmao
-~/.local/bin/longmao-stop
-~/.local/bin/longmao-status
-~/.local/bin/longmao-configure
-~/.local/bin/longmao-repair
-~/.local/bin/longmao-uninstall
+# 旧版 longmao-stop 等兼容 wrapper 仍会保留
 ```
 
 如果 `~/.local/bin` 还没在 PATH，重新登录桌面会话通常会生效；也可以直接运行：
@@ -89,12 +85,32 @@ Longmao 不会把 Totoro 或 WMPFDebugger 源码预先打包进安装器。
 ~/.local/bin/longmao
 ```
 
+## CLI
+
+安装后统一使用一个命令：
+
+```bash
+longmao help
+longmao start
+longmao stop
+longmao restart
+longmao status
+longmao configure
+longmao repair
+longmao logs
+longmao open
+longmao version
+longmao uninstall
+```
+
+旧的 `longmao-stop`、`longmao-status` 等命令仍作为兼容别名保留，但新文档统一使用 `longmao <command>`。
+
 ## 每次使用
 
 运行：
 
 ```bash
-longmao
+longmao start
 ```
 
 启动器会依次检查/启动：
@@ -142,7 +158,7 @@ http://127.0.0.1:3210
 ## 状态
 
 ```bash
-longmao-status
+longmao status
 ```
 
 例如：
@@ -158,7 +174,7 @@ UP    WMPF-CDP      127.0.0.1:62000
 ## 停止
 
 ```bash
-longmao-stop
+longmao stop
 ```
 
 只停止 Longmao 自己记录并管理的进程。
@@ -168,15 +184,15 @@ longmao-stop
 ## 修改后台
 
 ```bash
-longmao-configure
-longmao-stop
+longmao configure
+longmao stop
 longmao
 ```
 
 ## 修复
 
 ```bash
-longmao-repair
+longmao repair
 ```
 
 会重新：
@@ -192,7 +208,7 @@ longmao-repair
 运行：
 
 ```bash
-longmao-uninstall
+longmao uninstall
 ```
 
 它会明确询问一次，然后删除：
@@ -209,7 +225,7 @@ longmao-uninstall
 ### 保留配置卸载
 
 ```bash
-longmao-uninstall --keep-config
+longmao uninstall --keep-config
 ```
 
 会保留：
@@ -221,7 +237,7 @@ longmao-uninstall --keep-config
 ### 自动确认
 
 ```bash
-longmao-uninstall --yes
+longmao uninstall --yes
 ```
 
 用于脚本化卸载。

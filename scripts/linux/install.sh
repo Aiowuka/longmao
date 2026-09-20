@@ -94,16 +94,20 @@ copy_longmao() {
 
 write_wrappers() {
   mkdir -p "$LONGMAO_BIN_ROOT_RESOLVED" "${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-  local action
-  for action in start stop status configure repair uninstall; do
-    local target="$LONGMAO_INSTALL_ROOT_RESOLVED/scripts/linux/$action.sh"
-    local wrapper="$LONGMAO_BIN_ROOT_RESOLVED/longmao"
-    [[ "$action" == start ]] || wrapper="$LONGMAO_BIN_ROOT_RESOLVED/longmao-$action"
-    cat >"$wrapper" <<EOF
+
+  cat >"$LONGMAO_BIN_ROOT_RESOLVED/longmao" <<EOF
 #!/usr/bin/env bash
-exec "$target" "\$@"
+exec "$LONGMAO_INSTALL_ROOT_RESOLVED/scripts/linux/longmao.sh" "\$@"
 EOF
-    chmod +x "$wrapper"
+  chmod +x "$LONGMAO_BIN_ROOT_RESOLVED/longmao"
+
+  local action
+  for action in stop status configure repair uninstall; do
+    cat >"$LONGMAO_BIN_ROOT_RESOLVED/longmao-$action" <<EOF
+#!/usr/bin/env bash
+exec "$LONGMAO_BIN_ROOT_RESOLVED/longmao" "$action" "\$@"
+EOF
+    chmod +x "$LONGMAO_BIN_ROOT_RESOLVED/longmao-$action"
   done
 
   cat >"${XDG_DATA_HOME:-$HOME/.local/share}/applications/longmao.desktop" <<EOF
@@ -111,7 +115,7 @@ EOF
 Type=Application
 Name=Longmao
 Comment=Start Longmao local orchestrator
-Exec=$LONGMAO_BIN_ROOT_RESOLVED/longmao
+Exec=$LONGMAO_BIN_ROOT_RESOLVED/longmao start
 Terminal=false
 Categories=Development;
 EOF
@@ -120,7 +124,7 @@ EOF
 [Desktop Entry]
 Type=Application
 Name=Longmao Status
-Exec=$LONGMAO_BIN_ROOT_RESOLVED/longmao-status
+Exec=$LONGMAO_BIN_ROOT_RESOLVED/longmao status
 Terminal=true
 Categories=Development;
 EOF
@@ -129,7 +133,7 @@ EOF
 [Desktop Entry]
 Type=Application
 Name=Longmao Uninstall
-Exec=$LONGMAO_BIN_ROOT_RESOLVED/longmao-uninstall
+Exec=$LONGMAO_BIN_ROOT_RESOLVED/longmao uninstall
 Terminal=true
 Categories=Development;
 EOF
@@ -195,6 +199,6 @@ JSON
 
 say '安装完成'
 printf 'Longmao: %s\nRuntime: %s\nConfig: %s\n'   "$LONGMAO_INSTALL_ROOT_RESOLVED" "$LONGMAO_RUNTIME_ROOT_RESOLVED" "$LONGMAO_CONFIG_FILE"
-printf '\n以后运行： longmao\n卸载： longmao-uninstall\n'
+printf '\n以后运行： longmao start\n查看帮助： longmao help\n卸载： longmao uninstall\n'
 
-"$LONGMAO_INSTALL_ROOT_RESOLVED/scripts/linux/start.sh"
+"$LONGMAO_INSTALL_ROOT_RESOLVED/scripts/linux/longmao.sh" start
