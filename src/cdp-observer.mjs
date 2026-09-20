@@ -85,6 +85,7 @@ export class CdpObserver {
     this.timeline = [];
     this.token = null;
     this.currentPage = null;
+    this.storageCaptureInFlight = false;
   }
 
   status() {
@@ -270,11 +271,35 @@ export class CdpObserver {
       this.targetRetryTimer = null;
       this.targetRetryCount = 0;
       this._record({kind: 'cdp_instrumented'});
+      await this.captureStoredToken().catch(error => {
+        this._record({kind: 'auth_storage_capture_failed', code: error?.code || 'CDP_STORAGE_READ_FAILED'});
+      });
     } else {
       this.lastError = 'CDP_TARGET_NOT_RESPONDING';
       this._scheduleInstrumentationRetry();
     }
     return this.status();
+  }
+
+  async captureStoredToken() {
+    if (this.storageCaptureInFlight || !this.socket || this.socket.readyState !== 1 || !this.instrumented) {
+      return false;
+    }
+    this.storageCaptureInFlight = true;
+    try {
+      const result = await this.command('Runtime.evaluate', {
+        expression: '(() => { try { return (typeof wx !== "undefined" && wx.getStorageSync) ? String(wx.getStorageSync("token") || "") : ""; } catch { return ""; } })()',
+        returnByValue: true,
+        awaitPromise: false,
+      });
+      const value = result?.result?.value;
+      if (typeof value === 'string' && value.trim()) {
+        return this._captureToken(value, 'wx-storage:token');
+      }
+      return false;
+    } finally {
+      this.storageCaptureInFlight = false;
+    }
   }
 
   command(method, params = {}) {
@@ -352,6 +377,13 @@ export class CdpObserver {
       this._captureResponseBody(params.requestId, url).catch(error => {
         this._record({kind: 'auth_body_capture_failed', code: error?.code || 'CDP_BODY_READ_FAILED'});
       });
+      return true;
+    }
+
+    if (message.method === 'Runtime.executionContextCreated') {
+      if (this.instrumented && !this.token) {
+        queueMicrotask(() => this.captureStoredToken().catch(() => {}));
+      }
       return true;
     }
 

@@ -150,3 +150,56 @@ test('CDP observer retries instrumentation until the miniapp target responds', a
   assert.ok(observer.events().some(event => event.kind === 'cdp_instrumented'));
   observer.disconnect();
 });
+
+
+test('CDP observer reads the miniapp token from wx storage without exposing arbitrary evaluation', async () => {
+  class FakeSocket {
+    constructor() {
+      this.readyState = 0;
+      this.listeners = new Map();
+      queueMicrotask(() => {
+        this.readyState = 1;
+        this.emit('open', {});
+      });
+    }
+
+    addEventListener(name, callback) {
+      const list = this.listeners.get(name) || [];
+      list.push(callback);
+      this.listeners.set(name, list);
+    }
+
+    emit(name, event) {
+      for (const callback of this.listeners.get(name) || []) callback(event);
+    }
+
+    send(raw) {
+      const message = JSON.parse(raw);
+      let result = {};
+      if (message.method === 'Runtime.evaluate') {
+        assert.match(message.params.expression, /wx\.getStorageSync\("token"\)/);
+        result = {result: {type: 'string', value: 'fixture-storage-token'}};
+      }
+      queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
+    }
+
+    close() {
+      this.readyState = 3;
+      this.emit('close', {});
+    }
+  }
+
+  const observer = new CdpObserver({
+    wsFactory: () => new FakeSocket(),
+    commandTimeoutMs: 50,
+  });
+  const status = await observer.connect();
+  assert.equal(status.instrumented, true);
+  assert.equal(observer.getToken(), 'fixture-storage-token');
+  const publicStatus = observer.status();
+  assert.equal(publicStatus.auth.present, true);
+  assert.equal(publicStatus.auth.source, 'wx-storage:token');
+  assert.notEqual(publicStatus.auth.preview, 'fixture-storage-token');
+  assert.ok(observer.events().some(event => event.kind === 'auth_captured' && event.source === 'wx-storage:token'));
+  observer.disconnect();
+});

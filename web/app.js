@@ -226,6 +226,7 @@ function renderEvents(events) {
     else if (event.kind === 'navigation') detail.textContent = event.url || '';
     else if (event.kind === 'cdp_instrument_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
     else if (event.kind === 'cdp_instrumented') detail.textContent = 'Network / Runtime / Page ready';
+    else if (event.kind === 'auth_storage_capture_failed') detail.textContent = event.code || 'storage read failed';
     else detail.textContent = event.code || '';
     const time = document.createElement('time');
     time.textContent = event.at ? new Date(event.at).toLocaleTimeString() : '';
