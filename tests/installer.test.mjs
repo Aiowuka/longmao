@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {spawnSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 
@@ -278,5 +280,47 @@ test('sanitized network metadata adapter never forwards headers, bodies, cookies
     const source = await read(path);
     assert.match(source, /apply-network-metadata-adapter\.mjs/);
     assert.match(source, /node "\$network_metadata_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
+  }
+});
+
+
+test('WMPF overlay patchers emit real source newlines when applied', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'longmao-wmpf-patcher-'));
+  const target = join(dir, 'index.ts');
+  try {
+    await writeFile(target, [
+      '// LONGMAO_WMPF_JSCONTEXT_ROUTING_V1',
+      'const debugMessageEmitter = { emit() {} };',
+      'const logger = { info() {} };',
+      'const jsContexts = new Map<string, string>();',
+      'let activeJsContextId = "";',
+      'function onMessage(unwrappedData: any) {',
+      '        if (unwrappedData.category === "addJsContext") {',
+      '            return;',
+      '        }',
+      '}',
+      '',
+    ].join('\n'));
+
+    for (const patcher of [
+      'patches/wmpf-debugger/apply-network-only-mode.mjs',
+      'patches/wmpf-debugger/apply-network-metadata-adapter.mjs',
+    ]) {
+      const result = spawnSync(process.execPath, [join(root, patcher), target], {
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 10000,
+      });
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+    }
+
+    const patched = await readFile(target, 'utf8');
+    assert.match(patched, /LONGMAO_WMPF_NETWORK_ONLY_MODE_V1/);
+    assert.match(patched, /LONGMAO_WMPF_NETWORK_METADATA_ADAPTER_V1/);
+    assert.match(patched, /let networkOnlySeen = false;\n\s+const emitNetworkOnlyAvailable/);
+    assert.match(patched, /const parseNetworkObject = .*\n\s+const findNetworkScalar/s);
+    assert.doesNotMatch(patched, /\\\\n/);
+  } finally {
+    await rm(dir, {recursive: true, force: true});
   }
 });
