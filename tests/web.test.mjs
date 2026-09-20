@@ -229,7 +229,11 @@ test('CDP observer polls wx storage until login completes', async () => {
       let result = {};
       if (message.method === 'Runtime.evaluate') {
         evaluateCount += 1;
-        result = {result: {type: 'string', value: evaluateCount >= 3 ? 'late-login-token' : ''}};
+        result = {result: {type: 'object', value: {
+          hasWx: true,
+          token: evaluateCount >= 3 ? 'late-login-token' : '',
+          keys: ['token'],
+        }}};
       }
       queueMicrotask(() => this.emit('message', {data: JSON.stringify({id: message.id, result})}));
     }
