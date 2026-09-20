@@ -233,3 +233,19 @@ test('safe miniapp diagnostics overlay upgrades existing WMPF routing patches', 
     assert.match(source, /node "\$diagnostics_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
   }
 });
+
+
+test('result-envelope jscontext inference supports Linux WeChat builds without addJsContext', async () => {
+  const patcher = await read('patches/wmpf-debugger/apply-result-jscontext-inference.mjs');
+  assert.match(patcher, /LONGMAO_WMPF_RESULT_JSCONTEXT_INFERENCE_V1/);
+  assert.match(patcher, /chromeDevtoolsResult/);
+  assert.match(patcher, /jscontext_id/);
+  assert.match(patcher, /inferred-from-chromeDevtoolsResult/);
+  assert.match(patcher, /Longmao\.jsContextAdded/);
+
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /apply-result-jscontext-inference\.mjs/);
+    assert.match(source, /node "\$result_context_patcher" "\$LONGMAO_WMPF\/src\/index\.ts"/);
+  }
+});
