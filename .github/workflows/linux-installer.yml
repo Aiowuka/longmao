@@ -46,6 +46,32 @@ jobs:
           bash -n install.sh scripts/linux/*.sh installer/linux/build.sh Install\ Longmao.sh Uninstall\ Longmao.sh
           shellcheck -x install.sh scripts/linux/*.sh installer/linux/build.sh Install\ Longmao.sh Uninstall\ Longmao.sh
 
+      - name: Smoke-test managed process PATH inheritance
+        run: |
+          test_root="$(mktemp -d)"
+          mkdir -p "$test_root/install/scripts/linux" "$test_root/runtime/node/bin" "$test_root/runtime/logs" "$test_root/runtime/pids" "$test_root/config" "$test_root/bin" "$test_root/work"
+          cp scripts/linux/common.sh "$test_root/install/scripts/linux/common.sh"
+          cat >"$test_root/runtime/node/bin/longmao-private-tool" <<'EOF'
+          #!/usr/bin/env bash
+          echo private-runtime-ok
+          EOF
+          chmod +x "$test_root/runtime/node/bin/longmao-private-tool"
+
+          HOME="$test_root/home" \
+          LONGMAO_INSTALL_ROOT="$test_root/install" \
+          LONGMAO_RUNTIME_ROOT="$test_root/runtime" \
+          LONGMAO_CONFIG_ROOT="$test_root/config" \
+          LONGMAO_BIN_ROOT="$test_root/bin" \
+          bash -c '
+            source "$LONGMAO_INSTALL_ROOT/scripts/linux/common.sh"
+            start_managed path-test "$LONGMAO_RUNTIME_ROOT/work" "longmao-private-tool"
+            for _ in {1..30}; do
+              grep -q "private-runtime-ok" "$LONGMAO_LOGS/path-test.out.log" 2>/dev/null && exit 0
+              sleep 0.1
+            done
+            exit 1
+          '
+
       - name: Smoke-test public curl bootstrap
         run: |
           LONGMAO_BOOTSTRAP_TEST_ONLY=1 bash install.sh | tee /tmp/longmao-bootstrap.txt

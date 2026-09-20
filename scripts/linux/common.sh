@@ -101,7 +101,7 @@ start_managed() {
   fi
   (
     cd "$workdir"
-    nohup bash -lc "exec $command" >>"$LONGMAO_LOGS/$name.out.log" 2>>"$LONGMAO_LOGS/$name.err.log" &
+    nohup bash -c "exec $command" >>"$LONGMAO_LOGS/$name.out.log" 2>>"$LONGMAO_LOGS/$name.err.log" &
     echo $! >"$pf"
   )
 }
