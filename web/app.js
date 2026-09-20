@@ -54,13 +54,24 @@ function renderCdp(cdp) {
     : (waitingTarget
       ? `等待小程序目标 · 自动重试 ${cdp.targetRetryCount || 0}/${cdp.targetRetryLimit || 0}`
       : (cdp.lastError || '否'));
+  const networkOnly = cdp.capabilityMode === 'NETWORK_ONLY';
+  $('#cdp-mode').textContent = networkOnly
+    ? `Network-only · ${cdp.networkDebugSource || 'network-debug'}`
+    : (cdp.capabilityMode === 'FULL_RUNTIME' ? 'Full runtime' : '检测中');
   $('#capture-origin').textContent = cdp.captureOrigin || '—';
   $('#cdp-event-count').textContent = String(cdp.eventCount || 0);
-  $('#cdp-token').textContent = cdp.auth?.present
-    ? `${cdp.auth.preview} · ${cdp.auth.length} chars · ${cdp.auth.source}`
-    : (cdp.authRetrying ? `等待登录态 · 自动重试 ${cdp.authRetryCount || 0}/${cdp.authRetryLimit || 0}` : '未捕获');
+  $('#cdp-token').textContent = networkOnly
+    ? 'AppService runtime 不可用'
+    : (cdp.auth?.present
+      ? `${cdp.auth.preview} · ${cdp.auth.length} chars · ${cdp.auth.source}`
+      : (cdp.authRetrying ? `等待登录态 · 自动重试 ${cdp.authRetryCount || 0}/${cdp.authRetryLimit || 0}` : '未捕获'));
   const keys = Array.isArray(cdp.storageKeys) ? cdp.storageKeys : [];
-  $('#storage-keys').textContent = keys.length ? keys.join(', ') : '—';
+  $('#storage-keys').textContent = networkOnly ? 'runtime unavailable' : (keys.length ? keys.join(', ') : '—');
+  const syncButton = $('#totoro-sync');
+  if (syncButton) {
+    syncButton.disabled = networkOnly || syncButton.dataset.busy === '1';
+    syncButton.title = networkOnly ? '当前 Linux 微信仅暴露网络调试通道，无法读取 AppService 登录态' : '';
+  }
 }
 
 function renderTotoro(status) {
@@ -244,6 +255,8 @@ function renderEvents(events) {
     else if (event.kind === 'wmpf_jscontext_probe_failed') detail.textContent = `${event.id} · ${event.code || 'probe failed'}`;
     else if (event.kind === 'auth_storage_capture_failed') detail.textContent = event.code || 'storage read failed';
     else if (event.kind === 'auth_storage_retry') detail.textContent = `attempt ${event.attempt}/${event.limit}`;
+    else if (event.kind === 'network_debug_available') detail.textContent = event.source || 'network-debug';
+    else if (event.kind === 'cdp_capability_mode') detail.textContent = `${event.mode || 'UNKNOWN'}${event.source ? ` · ${event.source}` : ''}`;
     else detail.textContent = event.code || '';
     const time = document.createElement('time');
     time.textContent = event.at ? new Date(event.at).toLocaleTimeString() : '';
@@ -298,6 +311,7 @@ async function cdpAction(path) {
 async function totoroSync() {
   const button = $('#totoro-sync');
   button.disabled = true;
+  button.dataset.busy = '1';
   button.textContent = '同步中…';
   try {
     const data = await post('/api/totoro/sync');
@@ -307,7 +321,9 @@ async function totoroSync() {
   } catch (error) {
     badge($('#totoro-badge'), error.message, 'danger');
   } finally {
-    button.disabled = false;
+    button.dataset.busy = '0';
+    const status = await request('/api/status').catch(() => null);
+    button.disabled = status?.cdp?.capabilityMode === 'NETWORK_ONLY';
     button.textContent = '用捕获 Token 同步 Totoro';
   }
 }
