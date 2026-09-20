@@ -30,12 +30,14 @@ test('source references require a full commit and correct repository URL', () =>
   const wrong = fresh(); wrong.sources[0].url = 'https://example.invalid'; invalid(wrong);
 });
 
-test('attribution and unintegrated status cannot be silently omitted', () => {
+test('attribution and integration status cannot be silently altered', () => {
   const missing = fresh(); delete missing.sources[0].creditedTo; invalid(missing);
   const blank = fresh(); blank.sources[0].creditedTo = ' '; invalid(blank);
-  for (const field of ['vendored', 'runtimeDependency', 'integrated']) {
-    const changed = fresh(); changed.sources[0][field] = true; invalid(changed);
-  }
+  const vendored = fresh(); vendored.sources[0].vendored = true; invalid(vendored);
+  const runtime = fresh(); runtime.sources[1].runtimeDependency = true; invalid(runtime);
+  const totoroIntegrated = fresh(); totoroIntegrated.sources[0].integrated = true; invalid(totoroIntegrated);
+  const wmpfNotIntegrated = fresh(); wmpfNotIntegrated.sources[1].integrated = false; invalid(wmpfNotIntegrated);
+  const kind = fresh(); kind.sources[1].integrationKind = 'vendored'; invalid(kind);
   const license = fresh(); delete license.sources[0].licenseStatus; invalid(license);
 });
 
@@ -46,14 +48,17 @@ test('invalid metadata dates and shapes fail validation', () => {
   }
 });
 
-test('sources command displays both credited reference snapshots', () => {
+test('sources command shows Totoro reference-only and WMPF optional sidecar integration', () => {
   const result = cli('sources');
   assert.equal(result.status, 0, result.stderr);
   const sources = JSON.parse(result.stdout).sources;
   assert.equal(sources.length, 2);
-  assert.match(sources[0].creditedTo, /yuyuyudlc/);
-  assert.match(sources[1].creditedTo, /evi0s/);
-  assert.ok(sources.every(source => source.integrated === false));
+  const totoro = sources.find(source => source.repository === 'yuyuyudlc/Totoro');
+  const wmpf = sources.find(source => source.repository === 'evi0s/WMPFDebugger');
+  assert.equal(totoro.integrated, false);
+  assert.equal(totoro.integrationKind, 'reference-only');
+  assert.equal(wmpf.integrated, true);
+  assert.equal(wmpf.integrationKind, 'optional-sidecar-cdp');
 });
 
 test('sources command rejects extra credential arguments without echoing them', () => {

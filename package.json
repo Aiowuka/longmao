@@ -1,10 +1,10 @@
 {
   "name": "longmao-local-lab",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
-  "description": "Local web lab with an offline workflow mock and loopback-only WMPFDebugger readiness bridge.",
+  "description": "Local WMPF/CDP console with allowlisted auth capture, self-hosted backend contract, and synthetic run workflow.",
   "engines": {
     "node": ">=22"
   },
@@ -13,7 +13,7 @@
     "sources": "node src/cli.mjs sources",
     "demo": "node src/cli.mjs demo",
     "web": "node src/web.mjs",
-    "test": "node --test tests/lab.test.mjs tests/provenance.test.mjs tests/web.test.mjs",
-    "reproduce": "node src/cli.mjs doctor && node --test tests/lab.test.mjs tests/provenance.test.mjs tests/web.test.mjs && node src/cli.mjs demo"
+    "test": "node --test tests/lab.test.mjs tests/provenance.test.mjs tests/web.test.mjs tests/integration.test.mjs",
+    "reproduce": "node src/cli.mjs doctor && node --test tests/lab.test.mjs tests/provenance.test.mjs tests/web.test.mjs tests/integration.test.mjs && node src/cli.mjs demo"
   }
 }

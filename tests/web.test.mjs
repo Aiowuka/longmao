@@ -36,23 +36,35 @@ test('WMPF port defaults match upstream defaults and reject invalid overrides', 
   assert.throws(() => resolveWmpfPorts({LONGMAO_WMPF_CDP_PORT: 'https://example.invalid'}), {code: 'INVALID_LOCAL_PORT'});
 });
 
-test('web root serves the local dashboard with no credential input', async () => {
+test('web root serves the local dashboard with no raw credential input', async () => {
   const response = await fetch(base + '/');
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Longmao 控制台/);
   assert.doesNotMatch(html, /type=["']password["']/i);
+  assert.doesNotMatch(html, /name=["']token["']/i);
   assert.match(response.headers.get('content-security-policy'), /default-src 'self'/);
 });
 
-test('status endpoint declares the local-only boundary', async () => {
+test('status endpoint declares loopback binding and no self-hosted backend when unconfigured', async () => {
   const response = await fetch(base + '/api/status');
   const status = await response.json();
   assert.equal(response.status, 200);
   assert.equal(status.bindHost, '127.0.0.1');
-  assert.equal(status.externalSubmission, false);
-  assert.equal(status.credentialCapture, false);
+  assert.equal(status.selfHostedSubmission, false);
+  assert.equal(status.cdp, null);
+  assert.equal(status.backend.configured, false);
   assert.equal(status.wmpf.capabilities.readsTraffic, false);
+});
+
+test('backend status is readable but write/read flow is unavailable without explicit config', async () => {
+  const statusResponse = await fetch(base + '/api/backend/status');
+  assert.equal(statusResponse.status, 200);
+  assert.equal((await statusResponse.json()).backend.configured, false);
+
+  const tasks = await fetch(base + '/api/backend/tasks');
+  assert.equal(tasks.status, 409);
+  assert.equal((await tasks.json()).code, 'BACKEND_NOT_CONFIGURED');
 });
 
 test('mock workflow can run from the web API and is persisted locally', async () => {
@@ -87,14 +99,16 @@ test('web API rejects production-like or extra mock options', async () => {
   }
 });
 
-test('web API requires JSON and does not expose unknown routes', async () => {
+test('web API requires JSON and does not expose generic replay routes', async () => {
   const wrongType = await fetch(base + '/api/mock/run', {method: 'POST', body: 'scenario=success'});
   assert.equal(wrongType.status, 415);
   assert.equal((await wrongType.json()).code, 'JSON_REQUIRED');
 
-  const missing = await fetch(base + '/api/submit-real');
-  assert.equal(missing.status, 404);
-  assert.equal((await missing.json()).code, 'NOT_FOUND');
+  for (const path of ['/api/submit-real', '/api/replay', '/api/request']) {
+    const missing = await fetch(base + path);
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).code, 'NOT_FOUND');
+  }
 });
 
 test('web server refuses non-loopback bind requests', async () => {

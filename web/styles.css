@@ -13,7 +13,7 @@ body {
     radial-gradient(circle at 90% 8%, rgba(31, 199, 157, .09), transparent 30rem),
     #0b0f17;
 }
-button, code, pre { font: inherit; }
+button, code, pre, input { font: inherit; }
 button {
   border: 0;
   border-radius: 12px;
@@ -39,7 +39,7 @@ button.secondary, button.ghost {
   margin-bottom: 28px;
 }
 .hero h1 { margin: 4px 0 10px; font-size: clamp(2.3rem, 6vw, 5rem); line-height: .98; letter-spacing: -.055em; }
-.lead { max-width: 760px; margin: 0; color: #9eabc1; line-height: 1.7; }
+.lead { max-width: 820px; margin: 0; color: #9eabc1; line-height: 1.7; }
 .eyebrow, .kicker { margin: 0; color: #7694ff; font-size: 12px; font-weight: 800; letter-spacing: .18em; }
 .hero-status { display: flex; gap: 10px; align-items: center; white-space: nowrap; }
 .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
@@ -50,13 +50,15 @@ button.secondary, button.ghost {
   backdrop-filter: blur(14px);
 }
 .card { grid-column: span 6; border-radius: 20px; padding: 22px; }
-.card.boundary { grid-column: span 12; }
 .card-head, .panel-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
 h2 { margin: 5px 0 0; font-size: 22px; letter-spacing: -.02em; }
 .badge {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 5px 10px;
   border-radius: 999px;
   font-size: 12px;
@@ -83,11 +85,20 @@ h2 { margin: 5px 0 0; font-size: 22px; letter-spacing: -.02em; }
   overflow-x: auto;
 }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
-.boundary ul { margin: 20px 0 0; padding-left: 22px; color: #b3bfd1; line-height: 1.9; }
-.boundary code { color: #c8d3ff; }
+.actions.tight { margin-top: 0; }
+.kv { margin: 20px 0 0; }
+.kv > div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #222b3a;
+}
+.kv dt { color: #77859c; }
+.kv dd { margin: 0; color: #c5d0e4; overflow-wrap: anywhere; }
 .panel { margin-top: 16px; border-radius: 20px; padding: 22px; }
 pre {
-  min-height: 180px;
+  min-height: 160px;
   margin: 18px 0 0;
   padding: 18px;
   overflow: auto;
@@ -97,18 +108,68 @@ pre {
   line-height: 1.55;
   border: 1px solid #1d2532;
 }
+.compact-pre { min-height: 94px; max-height: 280px; }
 .sources { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
 .source { border: 1px solid #242d3d; border-radius: 14px; padding: 16px; background: #0d131d; }
 .source strong, .source code, .source small { display: block; }
 .source code { margin-top: 7px; color: #b8c7ff; }
 .source p { color: #9eabc1; line-height: 1.55; }
 .source small { color: #728096; }
+.run-form {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(4, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.run-form label {
+  display: grid;
+  gap: 7px;
+  color: #8795aa;
+  font-size: 12px;
+  font-weight: 700;
+}
+.run-form input {
+  width: 100%;
+  min-width: 0;
+  border-radius: 11px;
+  border: 1px solid #2a3446;
+  background: #0b111a;
+  color: #e4eaf5;
+  padding: 11px 12px;
+  outline: none;
+}
+.run-form input:focus { border-color: #6d8cff; box-shadow: 0 0 0 3px rgba(109,140,255,.12); }
+.event-list { display: grid; gap: 8px; margin-top: 18px; max-height: 520px; overflow: auto; }
+.event-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid #222b3a;
+  background: #0c121b;
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.event-row > div { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.event-row strong { min-width: 115px; color: #aab9f6; }
+.event-row span { color: #a2aec0; overflow-wrap: anywhere; }
+.event-row time { color: #66758b; white-space: nowrap; font-size: 12px; }
+.muted { color: #728096; }
 footer { display: flex; justify-content: space-between; gap: 16px; color: #6f7c91; font-size: 13px; padding: 20px 2px 0; }
+@media (max-width: 1000px) {
+  .run-form { grid-template-columns: repeat(2, 1fr); }
+  .run-form button { min-height: 43px; }
+}
 @media (max-width: 780px) {
   .shell { padding-top: 32px; }
   .hero { align-items: start; flex-direction: column; }
-  .card, .card.boundary { grid-column: span 12; }
+  .card { grid-column: span 12; }
   .sources { grid-template-columns: 1fr; }
   .ports { grid-template-columns: 1fr; }
+  .run-form { grid-template-columns: 1fr; }
+  .event-row { align-items: start; }
+  .event-row > div { display: grid; gap: 3px; }
+  .event-row strong { min-width: 0; }
   footer { flex-direction: column; }
 }

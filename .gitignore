@@ -6,5 +6,6 @@ artifacts/
 *.har
 *.tmp
 vendor/
+config/backend.json
 .DS_Store
 Thumbs.db

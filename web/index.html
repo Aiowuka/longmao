@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="dark">
   <title>Longmao Local Lab</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -13,11 +13,11 @@
       <div>
         <p class="eyebrow">LOCAL AUTOMATION LAB</p>
         <h1>Longmao 控制台</h1>
-        <p class="lead">把离线 Totoro 风格流程与 WMPFDebugger 的本机运行状态放到一个页面里。所有 Web API 只绑定 127.0.0.1。</p>
+        <p class="lead">WMPFDebugger → CDP → 自有后台登录态 → 本地生成测试跑步数据 → start / submit / receipt。Longmao Web 本身只监听 127.0.0.1。</p>
       </div>
       <div class="hero-status">
         <span id="overall-badge" class="badge neutral">检查中</span>
-        <button id="refresh" class="ghost">刷新状态</button>
+        <button id="refresh" class="ghost">刷新</button>
       </div>
     </header>
 
@@ -26,7 +26,7 @@
         <div class="card-head">
           <div>
             <p class="kicker">WMPF SIDECAR</p>
-            <h2>本机调试桥</h2>
+            <h2>调试桥</h2>
           </div>
           <span id="wmpf-badge" class="badge neutral">检查中</span>
         </div>
@@ -34,48 +34,108 @@
           <div><span>Debug bridge</span><strong id="debug-port">9421</strong><small id="debug-state">—</small></div>
           <div><span>CDP proxy</span><strong id="cdp-port">62000</strong><small id="cdp-state">—</small></div>
         </div>
-        <p id="wmpf-hint" class="hint">只检测本机端口是否监听，不读取网络包、Cookie、Token 或业务请求。</p>
         <code class="command">npx ts-node src/index.ts</code>
       </article>
 
       <article class="card">
         <div class="card-head">
           <div>
-            <p class="kicker">TOToro-STYLE LAB</p>
-            <h2>离线流程实验</h2>
+            <p class="kicker">CDP SESSION</p>
+            <h2>小程序运行时</h2>
           </div>
-          <span class="badge safe">Mock only</span>
+          <span id="cdp-badge" class="badge neutral">未连接</span>
         </div>
-        <p class="hint">运行六阶段内存模拟：模拟登录 → 固定任务 → 创建任务 → 固定样本 → Mock 提交 → 回执验证。</p>
+        <dl class="kv">
+          <div><dt>Instrumentation</dt><dd id="cdp-instrumented">—</dd></div>
+          <div><dt>当前页面</dt><dd id="cdp-page">—</dd></div>
+          <div><dt>Token</dt><dd id="cdp-token">未捕获</dd></div>
+          <div><dt>事件</dt><dd id="cdp-event-count">0</dd></div>
+        </dl>
         <div class="actions">
-          <button data-scenario="success">运行成功流程</button>
-          <button data-scenario="expired-session" class="secondary">测试会话过期</button>
-          <button data-scenario="rejected-submission" class="secondary">测试拒绝提交</button>
+          <button id="cdp-connect">连接 CDP</button>
+          <button id="cdp-disconnect" class="secondary">断开</button>
+          <button id="cdp-clear-auth" class="secondary">清除 Token</button>
         </div>
       </article>
 
-      <article class="card boundary">
+      <article class="card">
         <div class="card-head">
           <div>
-            <p class="kicker">SAFETY BOUNDARY</p>
-            <h2>当前接线边界</h2>
+            <p class="kicker">OWNED BACKEND</p>
+            <h2>自有后台</h2>
           </div>
-          <span class="badge safe">Local only</span>
+          <span id="backend-badge" class="badge neutral">未配置</span>
         </div>
-        <ul>
-          <li>Web 服务固定绑定 <code>127.0.0.1</code>。</li>
-          <li>WMPF 仅做 9421 / 62000 端口健康探测。</li>
-          <li>没有凭据输入框、Token 提取、请求重放或外部成绩提交。</li>
-          <li>实验输出只写入本地 <code>artifacts/last-report.json</code>。</li>
-        </ul>
+        <dl class="kv">
+          <div><dt>Origin</dt><dd id="backend-origin">—</dd></div>
+          <div><dt>配置文件</dt><dd id="backend-config-path">—</dd></div>
+          <div><dt>登录态</dt><dd id="backend-auth">—</dd></div>
+          <div><dt>最近运行</dt><dd id="backend-latest">—</dd></div>
+        </dl>
+        <div class="actions">
+          <button id="backend-profile" class="secondary">读取 Profile</button>
+          <button id="backend-tasks" class="secondary">读取 Tasks</button>
+        </div>
+        <pre id="backend-data" class="compact-pre">尚未读取。</pre>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <p class="kicker">MOCK BASELINE</p>
+            <h2>离线回归流程</h2>
+          </div>
+          <span class="badge safe">Mock</span>
+        </div>
+        <p class="hint">保留原来的离线状态机，用来确认 Longmao 自身没有因为真实接线而回归。</p>
+        <div class="actions">
+          <button data-scenario="success">成功流程</button>
+          <button data-scenario="expired-session" class="secondary">会话过期</button>
+          <button data-scenario="rejected-submission" class="secondary">拒绝提交</button>
+        </div>
       </article>
     </section>
 
     <section class="panel">
       <div class="panel-head">
         <div>
-          <p class="kicker">LATEST RUN</p>
-          <h2>最近一次实验</h2>
+          <p class="kicker">SELF-HOSTED RUN</p>
+          <h2>生成并提交测试跑步</h2>
+        </div>
+        <span id="real-run-badge" class="badge neutral">等待</span>
+      </div>
+      <p class="hint">只提交到 <code>config/backend.json</code> 配置的自有后台。生成的数据始终带 <code>synthetic: true</code>。</p>
+      <form id="run-form" class="run-form">
+        <label>Task ID<input name="taskId" value="demo-task" maxlength="128" required></label>
+        <label>距离（m）<input name="distanceMeters" type="number" value="3000" min="100" max="50000" required></label>
+        <label>时长（s）<input name="durationSeconds" type="number" value="1200" min="30" max="86400" required></label>
+        <label>中心纬度<input name="centerLat" type="number" step="0.000001" value="31.2304" min="-85" max="85" required></label>
+        <label>中心经度<input name="centerLon" type="number" step="0.000001" value="121.4737" min="-180" max="180" required></label>
+        <button type="submit">开始完整链路</button>
+      </form>
+      <pre id="real-report">尚未运行。</pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">CDP TIMELINE</p>
+          <h2>允许域名事件</h2>
+        </div>
+        <div class="actions tight">
+          <button id="events-refresh" class="secondary">刷新事件</button>
+          <button id="events-clear" class="secondary">清空</button>
+        </div>
+      </div>
+      <p class="hint">Network 只记录已配置 backend origin 的路径、方法和状态码；Console 只记录级别与参数数量，不展示参数值。</p>
+      <div id="events" class="event-list"><p class="muted">暂无事件。</p></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">LATEST MOCK</p>
+          <h2>最近一次离线实验</h2>
         </div>
         <span id="run-badge" class="badge neutral">暂无</span>
       </div>
