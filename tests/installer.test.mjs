@@ -175,6 +175,15 @@ test('Linux WMPF supervisor waits for WeChatAppEx and restarts upstream debugger
 });
 
 
+test('Linux install and repair restore pinned upstreams before applying overlays', async () => {
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /git -C "\$dest" reset --hard "\$commit"/);
+    assert.match(source, /git -C "\$dest" clean -fdx/);
+  }
+});
+
+
 test('WMPFDebugger dependencies follow upstream Yarn lockfile', async () => {
   const install = await read('scripts/linux/install.sh');
   const repair = await read('scripts/linux/repair.sh');
