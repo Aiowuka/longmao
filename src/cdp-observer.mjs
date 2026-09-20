@@ -101,6 +101,8 @@ export class CdpObserver {
     this.wmpfJsContexts = new Map();
     this.wmpfJsContextId = null;
     this.wmpfRoutingAvailable = null;
+    this.wmpfRoutingErrorRecorded = false;
+    this.wmpfEmptyContextsRecorded = false;
     this.capabilityMode = 'UNKNOWN';
     this.networkDebugSource = null;
   }
@@ -288,6 +290,8 @@ export class CdpObserver {
     this.wmpfJsContexts.clear();
     this.wmpfJsContextId = null;
     this.wmpfRoutingAvailable = null;
+    this.wmpfRoutingErrorRecorded = false;
+    this.wmpfEmptyContextsRecorded = false;
     this.capabilityMode = 'UNKNOWN';
     this.networkDebugSource = null;
     this.storageKeys = [];
@@ -323,6 +327,7 @@ export class CdpObserver {
       this.instrumented = false;
       return this.status();
     }
+    const wasInstrumented = this.instrumented;
     const results = await Promise.allSettled([
       this.command('Network.enable'),
       this.command('Runtime.enable'),
@@ -334,7 +339,7 @@ export class CdpObserver {
       if (this.targetRetryTimer) clearTimeout(this.targetRetryTimer);
       this.targetRetryTimer = null;
       this.targetRetryCount = 0;
-      this._record({kind: 'cdp_instrumented'});
+      if (!wasInstrumented) this._record({kind: 'cdp_instrumented'});
       const captured = await this.captureStoredToken().catch(error => {
         this._record({kind: 'auth_storage_capture_failed', code: error?.code || 'CDP_STORAGE_READ_FAILED'});
         return false;
@@ -375,9 +380,18 @@ export class CdpObserver {
       result = await this.command('Longmao.getJsContexts');
     } catch (error) {
       if (error?.code === 'CDP_COMMAND_ERROR') this.wmpfRoutingAvailable = false;
+      if (!this.wmpfRoutingErrorRecorded) {
+        this.wmpfRoutingErrorRecorded = true;
+        this._record({
+          kind: 'wmpf_routing_unavailable',
+          code: error?.code || 'WMPF_ROUTING_QUERY_FAILED',
+          method: 'Longmao.getJsContexts',
+        });
+      }
       return [];
     }
 
+    this.wmpfRoutingErrorRecorded = false;
     const contexts = Array.isArray(result?.contexts)
       ? result.contexts
           .filter(item => item && typeof item.id === 'string' && item.id)
@@ -394,6 +408,12 @@ export class CdpObserver {
       this.wmpfJsContextId = result.activeId;
     }
     const after = JSON.stringify(contexts);
+    if (contexts.length === 0 && !this.wmpfEmptyContextsRecorded) {
+      this.wmpfEmptyContextsRecorded = true;
+      this._record({kind: 'wmpf_jscontexts_empty'});
+    } else if (contexts.length > 0) {
+      this.wmpfEmptyContextsRecorded = false;
+    }
     if (before !== after) {
       this._record({
         kind: 'wmpf_jscontexts',
