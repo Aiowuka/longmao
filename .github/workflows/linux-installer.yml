@@ -1,0 +1,67 @@
+name: Build Linux installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/linux-one-click-installer
+    paths:
+      - 'scripts/linux/**'
+      - 'installer/linux/**'
+      - 'Install Longmao.sh'
+      - 'Uninstall Longmao.sh'
+      - 'src/**'
+      - 'web/**'
+      - 'tests/**'
+      - 'package.json'
+      - '.github/workflows/linux-installer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run Longmao tests
+        run: npm test
+
+      - name: Install packaging lint tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y makeself shellcheck
+
+      - name: Validate Linux shell scripts
+        run: |
+          bash -n scripts/linux/*.sh installer/linux/build.sh Install\ Longmao.sh Uninstall\ Longmao.sh
+          shellcheck -x scripts/linux/*.sh installer/linux/build.sh Install\ Longmao.sh Uninstall\ Longmao.sh
+
+      - name: Build .run installer
+        run: ./installer/linux/build.sh 0.5.0
+
+      - name: Inspect self-extracting archive
+        run: |
+          chmod +x installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run
+          installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run --list > /tmp/longmao-run-list.txt
+          grep -q 'scripts/linux/install.sh' /tmp/longmao-run-list.txt
+          grep -q 'scripts/linux/uninstall.sh' /tmp/longmao-run-list.txt
+          grep -q 'src/web.mjs' /tmp/longmao-run-list.txt
+
+      - name: Upload Linux installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: LongmaoSetup-0.5.0-linux-x64
+          path: |
+            installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run
+            installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run.sha256
+          if-no-files-found: error
+          retention-days: 30

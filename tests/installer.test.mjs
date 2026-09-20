@@ -17,7 +17,7 @@ test('Windows bootstrap pins upstream snapshots and fetches them from upstream r
   assert.match(source, /git\.exe -C \$Destination fetch origin \$Commit/);
 });
 
-test('installer does not package runtime clones, credentials or generated local config', async () => {
+test('Windows installer does not package runtime clones, credentials or generated local config', async () => {
   const source = await read('installer/windows/Longmao.iss');
   assert.doesNotMatch(source, /upstreams\\Totoro|upstreams\\WMPFDebugger/);
   assert.match(source, /config\\totoro\.json/);
@@ -25,7 +25,7 @@ test('installer does not package runtime clones, credentials or generated local 
   assert.match(source, /bootstrap\.ps1/);
 });
 
-test('runtime stack remains loopback-only on expected ports', async () => {
+test('Windows runtime stack remains loopback-only on expected ports', async () => {
   const source = await read('scripts/windows/start.ps1');
   for (const port of ['6379', '3000', '3210', '62000']) assert.match(source, new RegExp(port));
   assert.match(source, /127\.0\.0\.1/);
@@ -35,7 +35,7 @@ test('runtime stack remains loopback-only on expected ports', async () => {
   assert.match(source, /node src\\web\.mjs/);
 });
 
-test('first-run config writes Totoro and Longmao to the same owned backend origin', async () => {
+test('Windows first-run config writes Totoro and Longmao to the same owned backend origin', async () => {
   const source = await read('scripts/windows/configure.ps1');
   assert.match(source, /SUNRUN_MINIPROGRAM_BASE_URL=\$BackendOrigin/);
   assert.match(source, /SUNRUN_MINIPROGRAM_FALLBACK_BASE_URL=\$BackendOrigin/);
@@ -47,4 +47,65 @@ test('Windows local runtime is stored outside the application directory', async 
   const source = await read('scripts/windows/common.ps1');
   assert.match(source, /LOCALAPPDATA/);
   assert.match(source, /LongmaoRuntime/);
+});
+
+test('Linux installer pins upstream snapshots and fetches them from upstream repositories', async () => {
+  const source = await read('scripts/linux/install.sh');
+  assert.match(source, /https:\/\/github\.com\/yuyuyudlc\/Totoro\.git/);
+  assert.match(source, /c499040d52c6e1d45f06f7949419799ccc770db9/);
+  assert.match(source, /https:\/\/github\.com\/evi0s\/WMPFDebugger\.git/);
+  assert.match(source, /8b1359fa282981a777eea72a4851a3e96674fa9c/);
+  assert.match(source, /git clone --filter=blob:none --no-checkout/);
+  assert.match(source, /git -C "\$dest" fetch origin "\$commit" --depth 1/);
+});
+
+test('Linux private Node 22 download verifies official SHA-256 before extraction', async () => {
+  const source = await read('scripts/linux/install.sh');
+  assert.match(source, /nodejs\.org\/dist\/latest-v22\.x\/SHASUMS256\.txt/);
+  assert.match(source, /sha256sum "\$tmp\/\$file"/);
+  assert.match(source, /\[\[ "\$actual" == "\$expected" \]\]/);
+  assert.match(source, /tar -xJf "\$tmp\/\$file" --strip-components=1/);
+});
+
+test('Linux runtime is user-scoped and keeps config separate from install files', async () => {
+  const source = await read('scripts/linux/common.sh');
+  assert.match(source, /\.local\/opt\/longmao/);
+  assert.match(source, /\.local\/share/);
+  assert.match(source, /\.config/);
+  assert.match(source, /\.local\/bin/);
+});
+
+test('Linux runtime stack is loopback-only and delegates business logic to Totoro', async () => {
+  const source = await read('scripts/linux/start.sh');
+  for (const port of ['6379', '3000', '3210', '62000']) assert.match(source, new RegExp(port));
+  assert.match(source, /127\.0\.0\.1/);
+  assert.match(source, /pnpm@10 start/);
+  assert.match(source, /pnpm@10 worker:run/);
+  assert.match(source, /npx ts-node src\/index\.ts --auto-detect/);
+  assert.match(source, /node src\/web\.mjs/);
+});
+
+test('Linux first-run config points Totoro and Longmao at the same backend origin', async () => {
+  const source = await read('scripts/linux/configure.sh');
+  assert.match(source, /SUNRUN_MINIPROGRAM_BASE_URL=\$backend_origin/);
+  assert.match(source, /SUNRUN_MINIPROGRAM_FALLBACK_BASE_URL=\$backend_origin/);
+  assert.match(source, /"origin": "\$backend_origin"/);
+  assert.match(source, /REDIS_URL=redis:\/\/127\.0\.0\.1:6379/);
+});
+
+test('Linux uninstaller removes only Longmao-owned trees and intentionally keeps distro packages', async () => {
+  const source = await read('scripts/linux/uninstall.sh');
+  assert.match(source, /rm -rf "\$LONGMAO_RUNTIME_ROOT_RESOLVED"/);
+  assert.match(source, /rm -rf "\$LONGMAO_INSTALL_ROOT_RESOLVED"/);
+  assert.match(source, /rm -rf "\$LONGMAO_CONFIG_ROOT_RESOLVED"/);
+  assert.match(source, /--keep-config/);
+  assert.doesNotMatch(source, /apt(?:-get)?\s+(?:remove|purge)|dnf\s+remove|pacman\s+-R/);
+});
+
+test('Linux .run build excludes local config and generated installer output', async () => {
+  const source = await read('installer/linux/build.sh');
+  assert.match(source, /--exclude='config\/totoro\.json'/);
+  assert.match(source, /--exclude='installer\/linux\/output'/);
+  assert.match(source, /makeself/);
+  assert.match(source, /scripts\/linux\/install\.sh/);
 });
