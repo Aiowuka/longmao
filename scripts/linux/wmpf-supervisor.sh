@@ -30,7 +30,9 @@ stop_child() {
       process_alive "$child_pid" || break
       sleep 0.1
     done
-    process_alive "$child_pid" && kill -9 "$child_pid" 2>/dev/null || true
+    if process_alive "$child_pid"; then
+      kill -9 "$child_pid" 2>/dev/null || true
+    fi
   fi
   wait "$child_pid" 2>/dev/null || true
   child_pid=''
