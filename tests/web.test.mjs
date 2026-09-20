@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {startWebServer} from '../src/web.mjs';
+import {startCdpAutoConnect, startWebServer} from '../src/web.mjs';
 import {CdpObserver} from '../src/cdp-observer.mjs';
 import {DEFAULT_WMPF_PORTS, resolveWmpfPorts} from '../src/wmpf-bridge.mjs';
 
@@ -327,4 +327,26 @@ test('web UI exposes safe CDP diagnostic fields', async () => {
   const html = await response.text();
   assert.match(html, /id="storage-keys"/);
   assert.match(html, /不记录请求头、Cookie、请求体、响应体或 query 值/);
+});
+
+
+test('CDP auto-connect loop retries until WMPF CDP becomes available', async () => {
+  let attempts = 0;
+  let connected = false;
+  const observer = {
+    status() {
+      return {connected, state: connected ? 'connected' : 'disconnected'};
+    },
+    async connect() {
+      attempts += 1;
+      if (attempts < 3) throw Object.assign(new Error('CDP_CONNECT_FAILED'), {code: 'CDP_CONNECT_FAILED'});
+      connected = true;
+      return this.status();
+    },
+  };
+  const stop = startCdpAutoConnect(observer, {intervalMs: 5});
+  await new Promise(resolve => setTimeout(resolve, 45));
+  stop();
+  assert.equal(connected, true);
+  assert.ok(attempts >= 3);
 });
