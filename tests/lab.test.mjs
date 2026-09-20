@@ -165,7 +165,7 @@ test('CLI persists reports and returns correct status for all scenarios', async 
   for (const [scenario, expectedStatus] of [['success', 0], ['expired-session', 1], ['rejected-submission', 1]]) {
     const result = cli('demo', '--scenario', scenario);
     assert.equal(result.status, expectedStatus, result.stderr);
-    const report = JSON.parse(await readFile(join(root, 'artifacts/last-report.json'), 'utf8'));
+    const report = JSON.parse(await readFile(join(root, `artifacts/report-${scenario}.json`), 'utf8'));
     assert.equal(report.scenario, scenario);
     assert.equal(report.ok, expectedStatus === 0);
   }
