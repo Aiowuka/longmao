@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$false)][string]$InstallRoot = '')
+﻿param([Parameter(Mandatory=$false)][string]$InstallRoot = '')
 $ErrorActionPreference = 'Stop'
 if (-not $InstallRoot) { $InstallRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path }
 . (Join-Path $PSScriptRoot 'common.ps1')
