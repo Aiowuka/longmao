@@ -77,6 +77,19 @@ checkout_pinned() {
   git -C "$dest" checkout --detach --force "$commit"
 }
 
+apply_wmpf_patches() {
+  local patch_file="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/0001-fix-legacy-scene-pointer.patch"
+  [[ -f "$patch_file" ]] || die "WMPFDebugger 补丁缺失: $patch_file"
+  if grep -q 'remoteDebugParametersPtr.add(structOffsets\[5\])' "$LONGMAO_WMPF/frida/hook.js"; then
+    git -C "$LONGMAO_WMPF" apply --check "$patch_file"
+    git -C "$LONGMAO_WMPF" apply "$patch_file"
+  elif grep -q 'remoteDebugConfigPtr.add(structOffsets\[5\])' "$LONGMAO_WMPF/frida/hook.js"; then
+    :
+  else
+    die 'WMPFDebugger hook.js 与预期不一致，拒绝静默打补丁。'
+  fi
+}
+
 copy_longmao() {
   say "安装 Longmao 到 $LONGMAO_INSTALL_ROOT_RESOLVED"
   local tmp
@@ -152,6 +165,7 @@ export PATH="$LONGMAO_NODE_ROOT/bin:$LONGMAO_BIN_ROOT_RESOLVED:$PATH"
 
 checkout_pinned "$TOTORO_REPO" "$TOTORO_COMMIT" "$LONGMAO_TOTORO" 'Totoro'
 checkout_pinned "$WMPF_REPO" "$WMPF_COMMIT" "$LONGMAO_WMPF" 'WMPFDebugger'
+apply_wmpf_patches
 
 say '安装 Totoro 依赖'
 (

@@ -172,3 +172,15 @@ test('WMPFDebugger dependencies follow upstream Yarn lockfile', async () => {
     assert.doesNotMatch(source, /\bnpm install\b/);
   }
 });
+
+
+test('Longmao carries an explicit WMPF Linux legacy scene pointer patch', async () => {
+  const patch = await read('patches/wmpf-debugger/0001-fix-legacy-scene-pointer.patch');
+  assert.match(patch, /-\s*miniappScenePtr = remoteDebugParametersPtr\.add/);
+  assert.match(patch, /\+\s*miniappScenePtr = remoteDebugConfigPtr\.add/);
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /apply_wmpf_patches/);
+    assert.match(source, /git -C "\$LONGMAO_WMPF" apply --check/);
+  }
+});

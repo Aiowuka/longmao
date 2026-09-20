@@ -24,6 +24,19 @@ checkout() {
   git -C "$dest" checkout --detach --force "$commit"
 }
 
+apply_wmpf_patches() {
+  local patch_file="$LONGMAO_INSTALL_ROOT_RESOLVED/patches/wmpf-debugger/0001-fix-legacy-scene-pointer.patch"
+  [[ -f "$patch_file" ]] || die "WMPFDebugger 补丁缺失: $patch_file"
+  if grep -q 'remoteDebugParametersPtr.add(structOffsets\[5\])' "$LONGMAO_WMPF/frida/hook.js"; then
+    git -C "$LONGMAO_WMPF" apply --check "$patch_file"
+    git -C "$LONGMAO_WMPF" apply "$patch_file"
+  elif grep -q 'remoteDebugConfigPtr.add(structOffsets\[5\])' "$LONGMAO_WMPF/frida/hook.js"; then
+    :
+  else
+    die 'WMPFDebugger hook.js 与预期不一致，拒绝静默打补丁。'
+  fi
+}
+
 say '修复 Totoro'
 checkout "$TOTORO_REPO" "$TOTORO_COMMIT" "$LONGMAO_TOTORO"
 (
@@ -34,6 +47,7 @@ checkout "$TOTORO_REPO" "$TOTORO_COMMIT" "$LONGMAO_TOTORO"
 
 say '修复 WMPFDebugger'
 checkout "$WMPF_REPO" "$WMPF_COMMIT" "$LONGMAO_WMPF"
+apply_wmpf_patches
 (
   cd "$LONGMAO_WMPF"
   rm -rf node_modules package-lock.json

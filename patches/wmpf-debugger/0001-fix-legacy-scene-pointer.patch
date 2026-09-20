@@ -1,0 +1,15 @@
+diff --git a/frida/hook.js b/frida/hook.js
+index db36e8b..0000000 100644
+--- a/frida/hook.js
++++ b/frida/hook.js
+@@ -84,7 +84,7 @@ const handleOnLoadStart = (a1, config) => {
+             .add(structOffsets[3])
+             .readPointer()
+             .add(structOffsets[4])
+             .readPointer();
+ 
+-        miniappScenePtr = remoteDebugParametersPtr.add(structOffsets[5]);
++        miniappScenePtr = remoteDebugConfigPtr.add(structOffsets[5]);
+     } else {
+         // later wmpf builds (win32)
+         const launchConfigOffsets = structOffsets.LaunchConfigOffsets;
