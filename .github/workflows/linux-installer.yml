@@ -6,9 +6,9 @@ on:
     branches:
       - feat/linux-one-click-installer
     paths:
+      - 'install.sh'
       - 'scripts/linux/**'
       - 'installer/linux/**'
-      - 'install.sh'
       - 'Install Longmao.sh'
       - 'Uninstall Longmao.sh'
       - 'src/**'
@@ -49,68 +49,7 @@ jobs:
       - name: Smoke-test public curl bootstrap
         run: |
           LONGMAO_BOOTSTRAP_TEST_ONLY=1 bash install.sh | tee /tmp/longmao-bootstrap.txt
-          grep -q '^Longmao bootstrap OK        run: |
-          test_root="$(mktemp -d)"
-          mkdir -p "$test_root/install/scripts/linux" "$test_root/runtime/logs" "$test_root/config" "$test_root/bin"
-          cp scripts/linux/common.sh scripts/linux/longmao.sh scripts/linux/start.sh scripts/linux/stop.sh scripts/linux/status.sh scripts/linux/configure.sh scripts/linux/repair.sh scripts/linux/uninstall.sh "$test_root/install/scripts/linux/"
-          chmod +x "$test_root/install/scripts/linux/"*.sh
-
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"             "$test_root/install/scripts/linux/longmao.sh" version | grep -q '^Longmao 0.5.0$'
-
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"             "$test_root/install/scripts/linux/longmao.sh" help | grep -q 'longmao status'
-
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"             "$test_root/install/scripts/linux/longmao.sh" status | grep -q 'Longmao local stack status'
-
-          if HOME="$test_root/home"              LONGMAO_INSTALL_ROOT="$test_root/install"              LONGMAO_RUNTIME_ROOT="$test_root/runtime"              LONGMAO_CONFIG_ROOT="$test_root/config"              LONGMAO_BIN_ROOT="$test_root/bin"                "$test_root/install/scripts/linux/longmao.sh" definitely-not-a-command; then
-            echo "unknown command unexpectedly succeeded" >&2
-            exit 1
-          fi
-
-      - name: Smoke-test Linux uninstaller in isolated HOME
-        run: |
-          test_root="$(mktemp -d)"
-          mkdir -p "$test_root/install" "$test_root/runtime" "$test_root/config" "$test_root/bin" "$test_root/data/applications" "$test_root/external"
-          touch "$test_root/install/app-file" "$test_root/runtime/runtime-file" "$test_root/config/config-file"
-          touch "$test_root/bin/longmao" "$test_root/bin/longmao-stop" "$test_root/bin/longmao-status" "$test_root/bin/longmao-configure" "$test_root/bin/longmao-repair" "$test_root/bin/longmao-uninstall"
-          touch "$test_root/data/applications/longmao.desktop" "$test_root/data/applications/longmao-status.desktop" "$test_root/data/applications/longmao-uninstall.desktop"
-          touch "$test_root/external/system-dependency-sentinel"
-
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"           XDG_DATA_HOME="$test_root/data"             scripts/linux/uninstall.sh --yes --keep-config
-
-          test ! -e "$test_root/install"
-          test ! -e "$test_root/runtime"
-          test -e "$test_root/config/config-file"
-          test -e "$test_root/external/system-dependency-sentinel"
-          test ! -e "$test_root/bin/longmao"
-          test ! -e "$test_root/data/applications/longmao.desktop"
-
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"           XDG_DATA_HOME="$test_root/data"             scripts/linux/uninstall.sh --yes
-
-          test ! -e "$test_root/config"
-          test -e "$test_root/external/system-dependency-sentinel"
-
-      - name: Build .run installer
-        run: ./installer/linux/build.sh 0.5.0
-
-      - name: Inspect self-extracting archive
-        run: |
-          chmod +x installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run
-          installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run --list > /tmp/longmao-run-list.txt
-          grep -q 'scripts/linux/install.sh' /tmp/longmao-run-list.txt
-          grep -q 'scripts/linux/longmao.sh' /tmp/longmao-run-list.txt
-          grep -q 'scripts/linux/uninstall.sh' /tmp/longmao-run-list.txt
-          grep -q 'src/web.mjs' /tmp/longmao-run-list.txt
-
-      - name: Upload Linux installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: LongmaoSetup-0.5.0-linux-x64
-          path: |
-            installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run
-            installer/linux/output/LongmaoSetup-0.5.0-linux-x64.run.sha256
-          if-no-files-found: error
-          retention-days: 30
- /tmp/longmao-bootstrap.txt
+          grep -q '^Longmao bootstrap OK$' /tmp/longmao-bootstrap.txt
           grep -q 'ref=6d0d52ef2124c4142a9877bb6915b916e98a0bb9' /tmp/longmao-bootstrap.txt
 
       - name: Smoke-test unified Longmao CLI
@@ -120,13 +59,33 @@ jobs:
           cp scripts/linux/common.sh scripts/linux/longmao.sh scripts/linux/start.sh scripts/linux/stop.sh scripts/linux/status.sh scripts/linux/configure.sh scripts/linux/repair.sh scripts/linux/uninstall.sh "$test_root/install/scripts/linux/"
           chmod +x "$test_root/install/scripts/linux/"*.sh
 
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"             "$test_root/install/scripts/linux/longmao.sh" version | grep -q '^Longmao 0.5.0$'
+          HOME="$test_root/home" \
+          LONGMAO_INSTALL_ROOT="$test_root/install" \
+          LONGMAO_RUNTIME_ROOT="$test_root/runtime" \
+          LONGMAO_CONFIG_ROOT="$test_root/config" \
+          LONGMAO_BIN_ROOT="$test_root/bin" \
+            "$test_root/install/scripts/linux/longmao.sh" version | grep -q '^Longmao 0.5.0$'
 
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"             "$test_root/install/scripts/linux/longmao.sh" help | grep -q 'longmao status'
+          HOME="$test_root/home" \
+          LONGMAO_INSTALL_ROOT="$test_root/install" \
+          LONGMAO_RUNTIME_ROOT="$test_root/runtime" \
+          LONGMAO_CONFIG_ROOT="$test_root/config" \
+          LONGMAO_BIN_ROOT="$test_root/bin" \
+            "$test_root/install/scripts/linux/longmao.sh" help | grep -q 'longmao status'
 
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"             "$test_root/install/scripts/linux/longmao.sh" status | grep -q 'Longmao local stack status'
+          HOME="$test_root/home" \
+          LONGMAO_INSTALL_ROOT="$test_root/install" \
+          LONGMAO_RUNTIME_ROOT="$test_root/runtime" \
+          LONGMAO_CONFIG_ROOT="$test_root/config" \
+          LONGMAO_BIN_ROOT="$test_root/bin" \
+            "$test_root/install/scripts/linux/longmao.sh" status | grep -q 'Longmao local stack status'
 
-          if HOME="$test_root/home"              LONGMAO_INSTALL_ROOT="$test_root/install"              LONGMAO_RUNTIME_ROOT="$test_root/runtime"              LONGMAO_CONFIG_ROOT="$test_root/config"              LONGMAO_BIN_ROOT="$test_root/bin"                "$test_root/install/scripts/linux/longmao.sh" definitely-not-a-command; then
+          if HOME="$test_root/home" \
+             LONGMAO_INSTALL_ROOT="$test_root/install" \
+             LONGMAO_RUNTIME_ROOT="$test_root/runtime" \
+             LONGMAO_CONFIG_ROOT="$test_root/config" \
+             LONGMAO_BIN_ROOT="$test_root/bin" \
+               "$test_root/install/scripts/linux/longmao.sh" definitely-not-a-command; then
             echo "unknown command unexpectedly succeeded" >&2
             exit 1
           fi
@@ -140,7 +99,13 @@ jobs:
           touch "$test_root/data/applications/longmao.desktop" "$test_root/data/applications/longmao-status.desktop" "$test_root/data/applications/longmao-uninstall.desktop"
           touch "$test_root/external/system-dependency-sentinel"
 
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"           XDG_DATA_HOME="$test_root/data"             scripts/linux/uninstall.sh --yes --keep-config
+          HOME="$test_root/home" \
+          LONGMAO_INSTALL_ROOT="$test_root/install" \
+          LONGMAO_RUNTIME_ROOT="$test_root/runtime" \
+          LONGMAO_CONFIG_ROOT="$test_root/config" \
+          LONGMAO_BIN_ROOT="$test_root/bin" \
+          XDG_DATA_HOME="$test_root/data" \
+            scripts/linux/uninstall.sh --yes --keep-config
 
           test ! -e "$test_root/install"
           test ! -e "$test_root/runtime"
@@ -149,7 +114,13 @@ jobs:
           test ! -e "$test_root/bin/longmao"
           test ! -e "$test_root/data/applications/longmao.desktop"
 
-          HOME="$test_root/home"           LONGMAO_INSTALL_ROOT="$test_root/install"           LONGMAO_RUNTIME_ROOT="$test_root/runtime"           LONGMAO_CONFIG_ROOT="$test_root/config"           LONGMAO_BIN_ROOT="$test_root/bin"           XDG_DATA_HOME="$test_root/data"             scripts/linux/uninstall.sh --yes
+          HOME="$test_root/home" \
+          LONGMAO_INSTALL_ROOT="$test_root/install" \
+          LONGMAO_RUNTIME_ROOT="$test_root/runtime" \
+          LONGMAO_CONFIG_ROOT="$test_root/config" \
+          LONGMAO_BIN_ROOT="$test_root/bin" \
+          XDG_DATA_HOME="$test_root/data" \
+            scripts/linux/uninstall.sh --yes
 
           test ! -e "$test_root/config"
           test -e "$test_root/external/system-dependency-sentinel"
