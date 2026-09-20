@@ -5,7 +5,7 @@ if (!target) throw new Error('usage: node apply-miniapp-diagnostics.mjs <WMPFDeb
 
 let source = await readFile(target, 'utf8');
 const marker = 'LONGMAO_WMPF_MINIAPP_DIAGNOSTICS_V1';
-if (source.includes(marker)) {
+if (source.includes(marker) || (source.includes('recentMiniappMessages') && source.includes('Longmao.getMiniappMessages'))) {
   console.log('WMPF miniapp diagnostics already applied');
   process.exit(0);
 }
