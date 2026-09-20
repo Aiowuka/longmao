@@ -194,6 +194,59 @@ test('WMPFDebugger dependencies follow upstream Yarn lockfile', async () => {
 });
 
 
+test('modern Linux WMPF compatibility overlay supports WeChat 4.1.13.9 runtime', async () => {
+  const patcher = await read('patches/wmpf-debugger/apply-linux-4.1.13.9-support.mjs');
+  assert.match(patcher, /4067695881/);
+  assert.match(patcher, /searchClientVersionInCmdline/);
+  assert.match(patcher, /resolveHostPath/);
+  assert.match(patcher, /0x900eee0/);
+  assert.match(patcher, /0xdc1c670/);
+
+  const temp = await mkdtemp(join(tmpdir(), 'longmao-wmpf-modern-'));
+  try {
+    const target = join(temp, 'src', 'platform', 'linux.ts');
+    const platformDir = dirname(target);
+    const {mkdir} = await import('node:fs/promises');
+    await mkdir(platformDir, {recursive: true});
+    await writeFile(target, 'function searchWmpfVersionInFile(filePath: string): number { return 0; }\n', 'utf8');
+
+    const run = spawnSync(process.execPath, [
+      join(root, 'patches/wmpf-debugger/apply-linux-4.1.13.9-support.mjs'),
+      target,
+    ], {encoding: 'utf8'});
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+
+    const patched = await readFile(target, 'utf8');
+    assert.match(patched, /--client_version=\(\\d\+\)/);
+    assert.match(patched, /WeChatAppEx root process not found/);
+
+    const config = JSON.parse(await readFile(
+      join(temp, 'frida', 'config', 'linux', 'addresses.4067695881.json'),
+      'utf8',
+    ));
+    assert.equal(config.Version, 4067695881);
+    assert.equal(config.LoadStartHookOffset, '0x900eee0');
+    assert.equal(config.CDPFilterHookOffset, '0xdc1c670');
+    assert.deepEqual(config.SceneOffsets, [56, 1528, 8, 1464, 16, 456]);
+  } finally {
+    await rm(temp, {recursive: true, force: true});
+  }
+
+  for (const path of ['scripts/linux/install.sh', 'scripts/linux/repair.sh']) {
+    const source = await read(path);
+    assert.match(source, /apply-linux-4\.1\.13\.9-support\.mjs/);
+    assert.match(source, /node "\$modern_linux_patcher" "\$LONGMAO_WMPF\/src\/platform\/linux\.ts"/);
+  }
+});
+
+test('Linux WMPF supervisor fails closed for unknown modern client_version values', async () => {
+  const source = await read('scripts/linux/wmpf-supervisor.sh');
+  assert.match(source, /detect_client_version/);
+  assert.match(source, /4067695881/);
+  assert.match(source, /尚未适配；为避免半工作状态，拒绝启动调试器/);
+});
+
+
 test('Longmao carries an explicit WMPF Linux legacy scene pointer patch', async () => {
   const patch = await read('patches/wmpf-debugger/0001-fix-legacy-scene-pointer.patch');
   assert.match(patch, /-\s*miniappScenePtr = remoteDebugParametersPtr\.add/);
