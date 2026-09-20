@@ -315,6 +315,7 @@ test('CDP observer can inspect miniapp storage key names without returning value
   observer.socket = socket;
   observer.state = 'connected';
   observer.instrumented = true;
+  socket.addEventListener('message', event => observer.ingest(event.data));
   const keys = await observer.inspectStorageKeys();
   assert.deepEqual(keys, ['sessionKey', 'profile']);
   assert.deepEqual(observer.status().storageKeys, ['sessionKey', 'profile']);
